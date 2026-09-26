@@ -5,6 +5,8 @@ spring:
 app:
   catalog:
     enabled: false
+  pricing:
+    enabled: false
   identity:
     enabled: false
   persistence:
