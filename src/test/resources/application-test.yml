@@ -3,6 +3,8 @@ spring:
     banner-mode: "off"
 
 app:
+  browse:
+    enabled: false
   catalog:
     enabled: false
   pricing:

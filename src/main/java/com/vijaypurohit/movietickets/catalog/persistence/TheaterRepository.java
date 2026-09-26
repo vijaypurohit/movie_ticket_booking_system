@@ -8,4 +8,5 @@ import com.vijaypurohit.movietickets.catalog.model.Theater;
 
 public interface TheaterRepository extends JpaRepository<Theater, UUID> {
     Page<Theater> findByCityId(UUID cityId, Pageable pageable);
+    Page<Theater> findByCityIdAndActiveTrue(UUID cityId, Pageable pageable);
 }
