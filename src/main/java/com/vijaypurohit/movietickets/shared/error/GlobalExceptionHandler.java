@@ -7,6 +7,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSourceResolvable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -86,6 +87,21 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         HttpHeaders headers = new HttpHeaders();
         headers.set(HttpHeaders.WWW_AUTHENTICATE, "Basic realm=\"movie-tickets\"");
         return response(headers, HttpStatus.UNAUTHORIZED, problem);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ResponseEntity<Object> handleDataIntegrityViolation(
+            DataIntegrityViolationException exception,
+            HttpServletRequest request) {
+        ProblemDetail problem = problemDetailsFactory.create(
+                HttpStatus.CONFLICT,
+                URI.create("/problems/data-conflict"),
+                "Data conflict",
+                "DATA_CONFLICT",
+                "The request conflicts with an existing or referenced record.",
+                request,
+                List.of());
+        return response(HttpStatus.CONFLICT, problem);
     }
 
     @ExceptionHandler(AccessDeniedException.class)

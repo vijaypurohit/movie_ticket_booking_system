@@ -3,6 +3,8 @@ spring:
     banner-mode: "off"
 
 app:
+  catalog:
+    enabled: false
   identity:
     enabled: false
   persistence:
