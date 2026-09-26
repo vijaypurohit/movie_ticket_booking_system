@@ -3,5 +3,10 @@ spring:
     banner-mode: "off"
 
 app:
+  identity:
+    enabled: false
+  persistence:
+    auditing:
+      enabled: false
   pagination:
     cursor-signing-key: test-only-cursor-signing-key-32-bytes
