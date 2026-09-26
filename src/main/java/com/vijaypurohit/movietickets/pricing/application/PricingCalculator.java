@@ -17,9 +17,15 @@ public class PricingCalculator {
     public BigDecimal calculate(PricingPlan plan, SeatCategory category, Instant screeningStart, ZoneId theaterZone) {
         Objects.requireNonNull(plan);
         Objects.requireNonNull(category);
-        DayOfWeek day = Objects.requireNonNull(screeningStart).atZone(Objects.requireNonNull(theaterZone)).getDayOfWeek();
         BigDecimal base = category == SeatCategory.PREMIUM ? plan.getPremiumPrice() : plan.getRegularPrice();
-        if (day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY) base = base.add(plan.getWeekendAdjustment());
+        return calculate(base, plan.getWeekendAdjustment(), screeningStart, theaterZone);
+    }
+
+    public BigDecimal calculate(BigDecimal basePrice, BigDecimal weekendAdjustment,
+            Instant screeningStart, ZoneId theaterZone) {
+        DayOfWeek day = Objects.requireNonNull(screeningStart).atZone(Objects.requireNonNull(theaterZone)).getDayOfWeek();
+        BigDecimal base = Objects.requireNonNull(basePrice);
+        if (day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY) base = base.add(Objects.requireNonNull(weekendAdjustment));
         return base.setScale(2, RoundingMode.HALF_UP);
     }
 }

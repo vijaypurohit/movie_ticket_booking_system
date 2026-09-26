@@ -7,6 +7,8 @@ app:
     enabled: false
   pricing:
     enabled: false
+  screening:
+    enabled: false
   identity:
     enabled: false
   persistence:

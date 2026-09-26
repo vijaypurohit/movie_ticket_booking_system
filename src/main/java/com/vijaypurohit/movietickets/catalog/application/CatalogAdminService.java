@@ -1,6 +1,7 @@
 package com.vijaypurohit.movietickets.catalog.application;
 
 import java.time.DateTimeException;
+import java.time.Clock;
 import java.time.ZoneId;
 import java.util.UUID;
 
@@ -31,6 +32,7 @@ import com.vijaypurohit.movietickets.catalog.web.CatalogResponses.MovieResponse;
 import com.vijaypurohit.movietickets.catalog.web.CatalogResponses.SeatResponse;
 import com.vijaypurohit.movietickets.catalog.web.CatalogResponses.TheaterResponse;
 import com.vijaypurohit.movietickets.shared.error.BadRequestException;
+import com.vijaypurohit.movietickets.shared.error.BusinessRuleViolationException;
 import com.vijaypurohit.movietickets.shared.error.ResourceNotFoundException;
 import com.vijaypurohit.movietickets.shared.identifier.IdGenerator;
 import com.vijaypurohit.movietickets.shared.pagination.PageLimits;
@@ -45,11 +47,15 @@ public class CatalogAdminService {
     private final SeatRepository seats;
     private final MovieRepository movies;
     private final IdGenerator ids;
+    private final FutureScreeningChecker futureScreenings;
+    private final Clock clock;
 
     public CatalogAdminService(CityRepository cities, TheaterRepository theaters,
-            AuditoriumRepository auditoriums, SeatRepository seats, MovieRepository movies, IdGenerator ids) {
+            AuditoriumRepository auditoriums, SeatRepository seats, MovieRepository movies, IdGenerator ids,
+            FutureScreeningChecker futureScreenings, Clock clock) {
         this.cities = cities; this.theaters = theaters; this.auditoriums = auditoriums;
         this.seats = seats; this.movies = movies; this.ids = ids;
+        this.futureScreenings = futureScreenings; this.clock = clock;
     }
 
     @Transactional
@@ -76,11 +82,11 @@ public class CatalogAdminService {
     @Transactional public AuditoriumResponse updateAuditorium(UUID id, AuditoriumRequest request) { Auditorium value = requireAuditorium(id); value.update(request.name()); return auditorium(value); }
     @Transactional public void deactivateAuditorium(UUID id) { requireAuditorium(id).deactivate(); }
 
-    @Transactional public SeatResponse createSeat(UUID auditoriumId, SeatRequest request) { return seat(seats.save(new Seat(ids.nextId(), requireAuditorium(auditoriumId), request.rowLabel(), request.seatNumber(), request.category()))); }
+    @Transactional public SeatResponse createSeat(UUID auditoriumId, SeatRequest request) { requireMutableLayout(auditoriumId); return seat(seats.save(new Seat(ids.nextId(), requireAuditorium(auditoriumId), request.rowLabel(), request.seatNumber(), request.category()))); }
     @Transactional(readOnly = true) public SeatResponse getSeat(UUID id) { return seat(requireSeat(id)); }
     @Transactional(readOnly = true) public PageResponse<SeatResponse> listSeats(UUID auditoriumId, Integer page, Integer size) { requireAuditorium(auditoriumId); return PageResponse.from(seats.findByAuditoriumId(auditoriumId, page(page, size, "rowLabel", "seatNumber")).map(this::seat)); }
-    @Transactional public SeatResponse updateSeat(UUID id, SeatRequest request) { Seat value = requireSeat(id); value.update(request.rowLabel(), request.seatNumber(), request.category()); return seat(value); }
-    @Transactional public void deactivateSeat(UUID id) { requireSeat(id).deactivate(); }
+    @Transactional public SeatResponse updateSeat(UUID id, SeatRequest request) { Seat value = requireSeat(id); requireMutableLayout(value.getAuditorium().getId()); value.update(request.rowLabel(), request.seatNumber(), request.category()); return seat(value); }
+    @Transactional public void deactivateSeat(UUID id) { Seat value = requireSeat(id); requireMutableLayout(value.getAuditorium().getId()); value.deactivate(); }
 
     @Transactional public MovieResponse createMovie(MovieRequest request) { return movie(movies.save(new Movie(ids.nextId(), request.title(), request.durationMinutes(), request.language()))); }
     @Transactional(readOnly = true) public MovieResponse getMovie(UUID id) { return movie(requireMovie(id)); }
@@ -96,6 +102,7 @@ public class CatalogAdminService {
     private Movie requireMovie(UUID id) { return movies.findById(id).orElseThrow(() -> missing("movie")); }
     private ResourceNotFoundException missing(String resource) { return new ResourceNotFoundException(resource + "-not-found", "Resource not found", "RESOURCE_NOT_FOUND", "The requested " + resource + " was not found."); }
     private BadRequestException invalid(String detail) { return new BadRequestException("invalid-catalog-request", "Invalid catalog request", "INVALID_CATALOG_REQUEST", detail); }
+    private void requireMutableLayout(UUID auditoriumId) { if (futureScreenings.hasFutureScreening(auditoriumId, clock.instant())) throw new BusinessRuleViolationException("/problems/seat-layout-in-use", "Seat layout in use", "SEAT_LAYOUT_IN_USE", "Create a new auditorium layout because a future screening already uses this one."); }
     private void validateZone(String zone) { try { ZoneId.of(zone); } catch (DateTimeException exception) { throw invalid("The time zone is invalid."); } }
     private CityResponse city(City v) { return new CityResponse(v.getId(), v.getName(), v.getCountry(), v.getTimeZone(), v.isActive(), v.getCreatedAt(), v.getUpdatedAt(), v.getVersion()); }
     private TheaterResponse theater(Theater v) { return new TheaterResponse(v.getId(), v.getCity().getId(), v.getName(), v.getAddress(), v.isActive(), v.getCreatedAt(), v.getUpdatedAt(), v.getVersion()); }
