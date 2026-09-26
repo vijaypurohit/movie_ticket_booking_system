@@ -1,3 +1,7 @@
 spring:
   main:
     banner-mode: "off"
+
+app:
+  pagination:
+    cursor-signing-key: test-only-cursor-signing-key-32-bytes

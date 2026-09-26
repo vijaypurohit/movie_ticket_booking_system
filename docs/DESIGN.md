@@ -56,6 +56,8 @@ The system is intended to be developed and demonstrated in 48 hours on one machi
 | API page size | default 20, maximum 100 |
 | Worker batch size | 100 records |
 
+Pagination follows the access pattern instead of forcing one mechanism on every collection. Movie and administrator lists use zero-based offset pagination because those screens benefit from page numbers and totals. Screening browse and customer booking history use opaque keyset cursors because they are time-ordered, mutable collections. Cities, theaters within a city, and a screening's complete seat layout are returned as bounded lists without pagination. Every paginated query uses deterministic ordering with the UUID as its final tie-breaker.
+
 ## 4. Technology Choices
 
 | Concern | Choice | Reason |
@@ -236,9 +238,9 @@ All APIs use JSON. springdoc-openapi exposes `/v3/api-docs` and `/swagger-ui.htm
 |---|---|---|
 | `GET /api/v1/cities` | Public | List active cities |
 | `GET /api/v1/theaters?cityId=` | Public | List theaters in a city |
-| `GET /api/v1/movies?cityId=&date=&cursor=` | Public | Browse available movies |
+| `GET /api/v1/movies?cityId=&date=&page=&size=` | Public | Browse available movies using zero-based offset pagination |
 | `GET /api/v1/movies/{movieId}` | Public | Movie details |
-| `GET /api/v1/screenings?cityId=&movieId=&theaterId=&date=&cursor=` | Public | Find screenings |
+| `GET /api/v1/screenings?cityId=&movieId=&theaterId=&date=&cursor=&limit=` | Public | Find screenings using a start-time cursor |
 | `GET /api/v1/screenings/{screeningId}` | Public | Screening and price summary |
 | `GET /api/v1/screenings/{screeningId}/seats` | Public | Seat layout and effective availability |
 | `POST /api/v1/seat-reservations` | Customer | Atomically reserve selected `screeningSeatIds` |
@@ -269,6 +271,8 @@ Reservation, booking, and cancellation creation require `Idempotency-Key`.
 /admin/api/v1/refund-policies
 ```
 
+Administrator collection endpoints use zero-based `page` and `size` parameters and return page metadata. The default size is 20 and the maximum is 100.
+
 Creating a screening rejects auditorium schedule overlap and materializes screening seats and final weekday/weekend prices in one transaction.
 
 ### Error response
@@ -283,7 +287,7 @@ Errors use RFC 9457 Problem Details with content type `application/problem+json`
   "detail": "One or more requested seats are no longer available.",
   "instance": "/api/v1/seat-reservations",
   "code": "SEAT_UNAVAILABLE",
-  "requestId": "01K...",
+  "requestId": "8f3d8cbe-0e42-4d9b-9d50-96199b173ba7",
   "fieldErrors": [
     {
       "field": "screeningSeatIds[1]",

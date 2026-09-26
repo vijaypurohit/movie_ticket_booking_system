@@ -1,6 +1,11 @@
 spring:
   application:
     name: movie-ticket-booking-system
+  config:
+    import: optional:file:.env[.properties]
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/movie_tickets}
     username: ${DB_USERNAME:movie_tickets}
@@ -18,3 +23,13 @@ spring:
 
 server:
   shutdown: graceful
+
+app:
+  pagination:
+    cursor-signing-key: ${CURSOR_SIGNING_KEY}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html

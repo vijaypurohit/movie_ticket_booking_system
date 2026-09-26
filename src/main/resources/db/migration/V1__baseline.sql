@@ -1,0 +1,1 @@
+-- Establishes Flyway history before domain tables are introduced.
