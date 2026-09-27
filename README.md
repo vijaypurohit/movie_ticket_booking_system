@@ -24,6 +24,7 @@ Everything else — the four-minute hold, the separate checkout lease, the compe
 10. [Running the tests](#10-running-the-tests)
 11. [Scope, assumptions and limitations](#11-scope-assumptions-and-limitations)
 12. [AI-assisted workflow](#12-ai-assisted-workflow)
+13. [License](#13-license)
 
 ---
 
@@ -1038,6 +1039,12 @@ Everything, including the PostgreSQL-backed suites:
 - Discount usage limits are enforced by a row lock on the code inside the checkout transaction, verified by a concurrent last-redemption test.
 
 ---
+
+---
+
+## 13. License
+
+Released under the [MIT License](LICENSE). Copyright © 2026 Vijay Purohit.
 
 ---
 

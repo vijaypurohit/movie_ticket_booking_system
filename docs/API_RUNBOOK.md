@@ -1225,11 +1225,53 @@ discount codes) **survives this**.
 
 ### §10.2 Hard reset — before the take you keep
 
-```sql
-DROP DATABASE movie_tickets;
+**Step 1 — stop the app.** `Ctrl-C` in the terminal running §0.1.
+
+**Step 2 — drop and recreate:**
+
+```bash
+psql -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+DROP DATABASE IF EXISTS movie_tickets WITH (FORCE);
 CREATE DATABASE movie_tickets OWNER movie_tickets;
+SQL
 ```
 
-Restart the app. Flyway and the seeder rebuild everything in a few seconds. The
-seeders run at startup, so a truncate alone is not enough — the app has to boot
-for the data to return.
+```
+DROP DATABASE
+CREATE DATABASE
+```
+
+**Step 3 — restart.** Flyway migrates and the seeders run at boot:
+
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=demo
+```
+
+**Step 4 — confirm, before you hit record:**
+
+```bash
+curl -s "$API/api/v1/cities" | jq -c '[.items[].name]'
+curl -s $ADMIN "$API/admin/api/v1/discount-codes?page=0&size=10" | jq -c '[.items[].code]'
+```
+
+```json
+["Demo Pune"]
+["DEMO10","DEMO50"]
+```
+
+Three things about that `psql` line, each of which will bite you otherwise:
+
+- **`-d postgres`, not `-d movie_tickets`.** You cannot drop the database you
+  are connected to.
+- **Run it as a superuser — your own login, not `movie_tickets`.** That role has
+  no `CREATEDB` privilege, so `psql -U movie_tickets` drops the database and
+  then fails on the `CREATE`, leaving you with no database at all.
+  `ON_ERROR_STOP=1` at least makes the failure loud. Verify with:
+  `psql -d postgres -tAc "select rolcreatedb from pg_roles where rolname='movie_tickets'"`
+- **`WITH (FORCE)` needs PostgreSQL 13+** (it terminates leftover connections,
+  so a stray `psql` session or an app you forgot to stop cannot block the drop).
+  README requires 15+, so this is safe; on 12 or older, drop `WITH (FORCE)` and
+  close the connections yourself.
+
+A truncate is not a substitute: the seeders run **at startup**, so the app has
+to boot for the data to come back.
