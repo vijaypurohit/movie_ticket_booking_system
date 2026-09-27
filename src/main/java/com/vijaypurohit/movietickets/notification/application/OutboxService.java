@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,9 +19,11 @@ import com.vijaypurohit.movietickets.notification.persistence.OutboxEventReposit
 @Service
 @ConditionalOnProperty(prefix = "app.notification", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class OutboxService {
-    private static final int MAX_ATTEMPTS = 5;
-    private final OutboxEventRepository events; private final Clock clock;
-    public OutboxService(OutboxEventRepository events, Clock clock) { this.events=events; this.clock=clock; }
+    private final OutboxEventRepository events; private final Clock clock; private final int maxAttempts;
+    public OutboxService(OutboxEventRepository events, Clock clock,
+            @Value("${app.notification.max-attempts:5}") int maxAttempts) {
+        this.events=events; this.clock=clock; this.maxAttempts=maxAttempts;
+    }
 
     @Transactional
     public List<DeliveryWork> claimReady() {
@@ -36,7 +39,7 @@ public class OutboxService {
         OutboxEvent event = events.findByIdForUpdate(eventId).orElseThrow();
         if (event.getStatus() != OutboxStatus.PROCESSING) return;
         if (result.succeeded()) event.delivered();
-        else if (result.retryable() && event.getAttemptCount() < MAX_ATTEMPTS)
+        else if (result.retryable() && event.getAttemptCount() < maxAttempts)
             event.retryAt(clock.instant().plusSeconds(1L << event.getAttemptCount()));
         else event.fail();
     }

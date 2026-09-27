@@ -57,11 +57,6 @@ public class PricingLookupService {
                 .toList();
     }
 
-    public DiscountLimits lockDiscount(UUID id) {
-        var discount = discountCodes.findByIdForUpdate(id).orElseThrow(() -> missing("Discount code"));
-        return new DiscountLimits(discount.getGlobalUsageLimit(), discount.getPerCustomerUsageLimit());
-    }
-
     private ResourceNotFoundException missing(String resource) { return new ResourceNotFoundException("not-found", resource + " not found", "RESOURCE_NOT_FOUND", "The requested resource was not found."); }
     private BusinessRuleViolationException inactive(String resource) { return new BusinessRuleViolationException("inactive-configuration", "Inactive configuration", "INACTIVE_CONFIGURATION", "The selected " + resource + " is inactive."); }
 
@@ -69,5 +64,4 @@ public class PricingLookupService {
     public record DiscountQuote(UUID discountCodeId, BigDecimal discount, BigDecimal total,
             Integer globalLimit, Integer perCustomerLimit) { }
     public record RefundRuleSnapshot(long cutoffMinutes, BigDecimal percentage) { }
-    public record DiscountLimits(Integer globalLimit, Integer perCustomerLimit) { }
 }

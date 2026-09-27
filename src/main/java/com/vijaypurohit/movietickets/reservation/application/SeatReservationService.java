@@ -6,7 +6,6 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.HashSet;
 import java.util.List;

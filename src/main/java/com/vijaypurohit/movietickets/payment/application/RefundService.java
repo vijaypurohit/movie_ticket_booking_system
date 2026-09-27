@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,13 +25,15 @@ import com.vijaypurohit.movietickets.shared.identifier.IdGenerator;
 @Service
 @ConditionalOnProperty(prefix = "app.booking", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class RefundService {
-    private static final int MAX_ATTEMPTS = 3;
     private final RefundRepository refunds; private final OutboxEventRepository outbox;
     private final CurrentUserProvider users; private final IdGenerator ids; private final Clock clock;
+    private final int maxAttempts;
 
     public RefundService(RefundRepository refunds, OutboxEventRepository outbox,
-            CurrentUserProvider users, IdGenerator ids, Clock clock) {
+            CurrentUserProvider users, IdGenerator ids, Clock clock,
+            @Value("${app.refund.max-attempts:3}") int maxAttempts) {
         this.refunds=refunds; this.outbox=outbox; this.users=users; this.ids=ids; this.clock=clock;
+        this.maxAttempts=maxAttempts;
     }
 
     @Transactional(readOnly = true)
@@ -59,7 +62,7 @@ public class RefundService {
             refund.succeed(result.providerReference());
             outbox.save(new OutboxEvent(ids.nextId(), "REFUND_SUCCEEDED", "REFUND", refund.getId(),
                     "refund-succeeded:" + refund.getId(), "{\"refundId\":\"" + refund.getId() + "\"}", now));
-        } else if (result.retryable() && refund.getAttemptCount() < MAX_ATTEMPTS) {
+        } else if (result.retryable() && refund.getAttemptCount() < maxAttempts) {
             refund.retryAt(now.plusSeconds(1L << refund.getAttemptCount()));
         } else {
             refund.fail(result.providerReference());
