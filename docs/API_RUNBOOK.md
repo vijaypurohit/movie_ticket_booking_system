@@ -53,7 +53,20 @@ DAY2=$(date -v+2d +%F 2>/dev/null || date -d '+2 day' +%F)
 DAY3=$(date -v+3d +%F 2>/dev/null || date -d '+3 day' +%F)
 DAY5=$(date -v+5d +%F 2>/dev/null || date -d '+5 day' +%F)
 echo "$DAY1 / $DAY2 / $DAY3 / $DAY5"
+
+SUF=$RANDOM        # unique-name suffix for §8; re-run before re-running a §8 block
+
+# Read an id out of a create response, or stop and show the server's error.
+# Without this, a failed create yields the string "null", every later URL
+# becomes .../null, and you get a confusing cascade of 400s.
+newid() { local body id; body=$(cat); id=$(jq -r '.id // empty' <<<"$body")
+  if [ -z "$id" ]; then printf 'CREATE FAILED: %s\n' "$body" >&2; return 1; fi
+  printf '%s\n' "$id"; }
 ```
+
+**Paste this whole block into every new terminal.** `newid` is a shell
+function, so it does not survive a new tab — `command not found: newid` further
+down means this step was skipped in that shell.
 
 Screening and seat IDs derive from the date, so fetch those as you go.
 
@@ -504,20 +517,51 @@ HALF=$(curl -s $ADMIN -H "$JSON" -d "{\"movieId\":\"$MOVIE\",\"auditoriumId\":\"
 
 SEATH=$(curl -s "$API/api/v1/screenings/$HALF/seats" | jq -r '[.[]|select(.state=="AVAILABLE")|.screeningSeatId][0]')
 RESH=$(curl -s $CUST1 -H "$JSON" -H "Idempotency-Key: h-r-$RANDOM" \
-  -d "{\"screeningSeatIds\":[\"$SEATH\"]}" "$API/api/v1/seat-reservations" | jq -r .id)
+  -d "{\"screeningSeatIds\":[\"$SEATH\"]}" "$API/api/v1/seat-reservations" | newid)
 BOOKH=$(curl -s $CUST1 -H "$JSON" -H "Idempotency-Key: h-b-$RANDOM" \
-  -d "{\"reservationId\":\"$RESH\",\"paymentToken\":\"tok_success\"}" "$API/api/v1/bookings" | jq -r .id)
+  -d "{\"reservationId\":\"$RESH\",\"paymentToken\":\"tok_success\"}" "$API/api/v1/bookings" | newid)
 
 curl -s $CUST1 -X POST -H "Idempotency-Key: h-c-$RANDOM" \
   "$API/api/v1/bookings/$BOOKH/cancellations" | jq -c '{bookingState, amount:.refund.amount}'
 ```
 
-Expect `125.00` on a ₹250 regular seat — half. Two caveats:
+Verified on a live instance:
 
-- **Overlap.** The seeded 18:30 show occupies Screen 1 from 18:30 to 20:30
-  local. If `now + 3 h` falls in that window — i.e. you are recording between
-  roughly 15:30 and 17:30 — creation returns a `409` and you should shift to
-  `+4 h` / `+6 h`, or just use §5.3, which is in its 50% window by then anyway.
+```json
+{"bookingState":"CANCELLED","amount":125.00}
+```
+
+₹250 paid → ₹125 refunded. Half, at any hour, with no dependence on the clock.
+
+Three caveats:
+
+- **`SCREENING_OVERLAP` on a re-run is the usual failure.** Screen 1 takes one
+  screening at a time, so a second run of this block collides with the
+  screening the first run left behind, and §5.6's window (`now+1h → now+3h`)
+  butts up against this one's (`now+3h → now+5h`):
+
+  ```json
+  {"status":409,"code":"SCREENING_OVERLAP",
+   "detail":"The auditorium already has a screening in this time range."}
+  ```
+
+  Cancel the earlier one and retry, or shift this block to `+6 h` / `+8 h`:
+
+  ```bash
+  # Cancel every ad-hoc screening on Screen 1. Seeded ones start 13:00Z, and the
+  # admin list includes already-CANCELLED rows, so filter on both.
+  curl -s $ADMIN "$API/admin/api/v1/screenings?auditoriumId=$AUDITORIUM&page=0&size=30" \
+    | jq -r '.items[]|select(.status=="ACTIVE" and (.startTime|endswith("13:00:00Z")|not))|.id' \
+    | while read -r id; do
+        curl -s $ADMIN -X DELETE -o /dev/null -w "cancelled $id → %{http_code}\n" \
+          "$API/admin/api/v1/screenings/$id"
+      done
+  ```
+
+- **A failed `newid` does not undo the `POST`.** If the create succeeded but the
+  pipeline did not — `newid` undefined, `jq` missing — the screening still
+  exists with its id lost. That is what the cleanup loop above is for.
+
 - **This screening survives the soft reset** (§10.1). Hard-reset (§10.2) before
   the take you keep, or it shows up in the catalog during Part 1.
 
@@ -572,13 +616,13 @@ END=$(python3   -c "import datetime;print((datetime.datetime.now(datetime.timezo
 SOON=$(curl -s $ADMIN -H "$JSON" -d "{\"movieId\":\"$MOVIE\",\"auditoriumId\":\"$AUDITORIUM\",
   \"pricingPlanId\":\"$PLAN\",\"refundPolicyId\":\"$POLICY\",
   \"startTime\":\"$START\",\"endTime\":\"$END\"}" \
-  "$API/admin/api/v1/screenings" | jq -r .id)
+  "$API/admin/api/v1/screenings" | newid)
 
 SEAT0=$(curl -s "$API/api/v1/screenings/$SOON/seats" | jq -r '[.[]|select(.state=="AVAILABLE")|.screeningSeatId][0]')
 RES0=$(curl -s $CUST1 -H "$JSON" -H "Idempotency-Key: z-r-$RANDOM" \
-  -d "{\"screeningSeatIds\":[\"$SEAT0\"]}" "$API/api/v1/seat-reservations" | jq -r .id)
+  -d "{\"screeningSeatIds\":[\"$SEAT0\"]}" "$API/api/v1/seat-reservations" | newid)
 BOOK0=$(curl -s $CUST1 -H "$JSON" -H "Idempotency-Key: z-b-$RANDOM" \
-  -d "{\"reservationId\":\"$RES0\",\"paymentToken\":\"tok_success\"}" "$API/api/v1/bookings" | jq -r .id)
+  -d "{\"reservationId\":\"$RES0\",\"paymentToken\":\"tok_success\"}" "$API/api/v1/bookings" | newid)
 
 curl -s $CUST1 -X POST -H "Idempotency-Key: z-c-$RANDOM" \
   "$API/api/v1/bookings/$BOOK0/cancellations" | jq -c '{bookingState, amount:.refund.amount}'
@@ -796,17 +840,13 @@ endpoint but is just a name collision:
 | Discount code | `code` | no |
 | Movie | — | yes |
 
-Two lines make every block below re-runnable and loud on failure:
+`SUF` and `newid` from §0.2 make every block below re-runnable and loud on
+failure. **If you get `command not found: newid`, you are in a shell that never
+ran §0.2** — paste it and carry on.
 
 ```bash
-SUF=$RANDOM        # fresh suffix per run; re-run this line before re-running a block
-
-newid() { local body id; body=$(cat); id=$(jq -r '.id // empty' <<<"$body")
-  if [ -z "$id" ]; then printf 'CREATE FAILED: %s\n' "$body" >&2; return 1; fi
-  printf '%s\n' "$id"; }
+SUF=$RANDOM        # re-run this line before re-running any §8 block
 ```
-
-`newid` prints the server's actual error instead of silently handing you `null`.
 
 **Finish every block you start.** A record you create and do not deactivate is
 `active:true`, and active records *are* public — an abandoned §8.1 leaves an
@@ -1049,7 +1089,7 @@ NEWSCR=$(curl -s $ADMIN -H "$JSON" -d "{
   \"movieId\":\"$MOVIE\",\"auditoriumId\":\"$AUDITORIUM\",
   \"pricingPlanId\":\"$PLAN\",\"refundPolicyId\":\"$POLICY\",
   \"startTime\":\"$ST\",\"endTime\":\"$EN\"}" \
-  "$API/admin/api/v1/screenings" | jq -r .id)
+  "$API/admin/api/v1/screenings" | newid)
 
 curl -s $ADMIN "$API/admin/api/v1/screenings/$NEWSCR" | jq -c
 curl -s $ADMIN "$API/admin/api/v1/screenings/$NEWSCR/prices" | jq -c
