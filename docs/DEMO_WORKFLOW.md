@@ -10,14 +10,14 @@ Set the values from `.env.example`, enable the demo profile, and start the appli
 JAVA_HOME=/path/to/jdk-21 ./mvnw spring-boot:run -Dspring-boot.run.profiles=demo
 ```
 
-Open `http://localhost:8080/swagger-ui.html`. The demo creates one movie with an evening screening on each of seven consecutive dates starting on the next Monday, including today when the application starts on a Monday.
+Open `http://localhost:8080/swagger-ui.html`. The demo creates one movie with an 18:30 IST screening on each of the seven consecutive dates starting tomorrow.
 
 ## 2. Discover a screening without authentication
 
 Execute these operations under **Public catalog** and **Public screenings**:
 
 1. `GET /api/v1/cities`; copy the first city `id`.
-2. `GET /api/v1/movies` with that `cityId` and the next Monday as `date`; copy the movie `id`.
+2. `GET /api/v1/movies` with that `cityId` and tomorrow's date as `date`; copy the movie `id`.
 3. `GET /api/v1/screenings` with the city, movie, and date; copy the first screening `id`.
 4. `GET /api/v1/screenings/{id}/seats`; copy one or two `AVAILABLE` screening-seat IDs.
 
