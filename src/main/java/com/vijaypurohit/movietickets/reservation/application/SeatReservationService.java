@@ -24,8 +24,8 @@ import com.vijaypurohit.movietickets.booking.application.BookingTransactionServi
 import com.vijaypurohit.movietickets.reservation.model.ReservationState;
 import com.vijaypurohit.movietickets.reservation.model.SeatReservation;
 import com.vijaypurohit.movietickets.reservation.persistence.SeatReservationRepository;
-import com.vijaypurohit.movietickets.reservation.web.ReservationRequests.CreateReservationRequest;
-import com.vijaypurohit.movietickets.reservation.web.ReservationResponses.ReservationResponse;
+import com.vijaypurohit.movietickets.generated.model.CreateReservationRequest;
+import com.vijaypurohit.movietickets.generated.model.ReservationResponse;
 import com.vijaypurohit.movietickets.screening.model.ScreeningSeat;
 import com.vijaypurohit.movietickets.screening.model.ScreeningSeatState;
 import com.vijaypurohit.movietickets.screening.model.ScreeningStatus;
@@ -68,7 +68,7 @@ public class SeatReservationService {
 
     private ReservationResponse createInTransaction(String idempotencyKey, CreateReservationRequest request) {
         UUID customerId = users.requireCustomerId();
-        List<UUID> requestedIds = request.screeningSeatIds().stream().sorted().toList();
+        List<UUID> requestedIds = request.getScreeningSeatIds().stream().sorted().toList();
         if (new HashSet<>(requestedIds).size() != requestedIds.size()) throw conflict("DUPLICATE_SEAT", "The request contains duplicate seats.");
         String fingerprint = fingerprint(requestedIds);
         var existing = reservations.findByCustomerIdAndIdempotencyKey(customerId, idempotencyKey);
@@ -138,6 +138,12 @@ public class SeatReservationService {
     }
     private SeatReservation requireOwned(UUID id) { UUID customerId = users.requireCustomerId(); return reservations.findByIdAndCustomerId(id, customerId).orElseThrow(() -> new ResourceNotFoundException("not-found", "Reservation not found", "RESOURCE_NOT_FOUND", "The requested reservation was not found.")); }
     private ConflictException conflict(String code, String detail) { return new ConflictException("reservation-conflict", "Reservation conflict", code, detail); }
-    private ReservationResponse response(SeatReservation reservation, List<ScreeningSeat> values) { return new ReservationResponse(reservation.getId(), reservation.getScreeningId(), values.stream().map(ScreeningSeat::getId).sorted().toList(), reservation.getState(), reservation.getExpiresAt(), reservation.getCreatedAt()); }
+    private ReservationResponse response(SeatReservation reservation, List<ScreeningSeat> values) { return new ReservationResponse()
+                .id(reservation.getId())
+                .screeningId(reservation.getScreeningId())
+                .screeningSeatIds(values.stream().map(ScreeningSeat::getId).sorted().toList())
+                .state(reservation.getState())
+                .expiresAt(reservation.getExpiresAt())
+                .createdAt(reservation.getCreatedAt()); }
     private String fingerprint(List<UUID> ids) { try { MessageDigest digest = MessageDigest.getInstance("SHA-256"); return HexFormat.of().formatHex(digest.digest(ids.toString().getBytes(StandardCharsets.UTF_8))); } catch (NoSuchAlgorithmException exception) { throw new IllegalStateException(exception); } }
 }

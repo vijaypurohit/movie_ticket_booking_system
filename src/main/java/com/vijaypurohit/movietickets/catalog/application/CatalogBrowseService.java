@@ -16,9 +16,9 @@ import com.vijaypurohit.movietickets.catalog.model.Movie;
 import com.vijaypurohit.movietickets.catalog.persistence.CityRepository;
 import com.vijaypurohit.movietickets.catalog.persistence.MovieRepository;
 import com.vijaypurohit.movietickets.catalog.persistence.TheaterRepository;
-import com.vijaypurohit.movietickets.catalog.web.BrowseResponses.CitySummary;
-import com.vijaypurohit.movietickets.catalog.web.BrowseResponses.MovieSummary;
-import com.vijaypurohit.movietickets.catalog.web.BrowseResponses.TheaterSummary;
+import com.vijaypurohit.movietickets.generated.model.CitySummary;
+import com.vijaypurohit.movietickets.generated.model.MovieSummary;
+import com.vijaypurohit.movietickets.generated.model.TheaterSummary;
 import com.vijaypurohit.movietickets.shared.error.ResourceNotFoundException;
 import com.vijaypurohit.movietickets.shared.pagination.PageLimits;
 import com.vijaypurohit.movietickets.shared.pagination.PageResponse;
@@ -45,7 +45,11 @@ public class CatalogBrowseService {
         requireActiveCity(cityId);
         var paging = PageRequest.of(PageLimits.resolvePage(page), PageLimits.resolve(size), Sort.by("name", "id"));
         return PageResponse.from(theaters.findByCityIdAndActiveTrue(cityId, paging)
-                .map(value -> new TheaterSummary(value.getId(), cityId, value.getName(), value.getAddress())));
+                .map(value -> new TheaterSummary()
+                .id(value.getId())
+                .cityId(cityId)
+                .name(value.getName())
+                .address(value.getAddress())));
     }
 
     @Transactional(readOnly = true)
@@ -70,8 +74,16 @@ public class CatalogBrowseService {
 
     private City requireActiveCity(UUID id) { return cities.findById(id).filter(City::isActive).orElseThrow(this::missing); }
     private ResourceNotFoundException missing() { return new ResourceNotFoundException("not-found", "Resource not found", "RESOURCE_NOT_FOUND", "The requested resource was not found."); }
-    private CitySummary city(City value) { return new CitySummary(value.getId(), value.getName(), value.getCountry(), value.getTimeZone()); }
-    private MovieSummary movie(Movie value) { return new MovieSummary(value.getId(), value.getTitle(), value.getDurationMinutes(), value.getLanguage()); }
+    private CitySummary city(City value) { return new CitySummary()
+                .id(value.getId())
+                .name(value.getName())
+                .country(value.getCountry())
+                .timeZone(value.getTimeZone()); }
+    private MovieSummary movie(Movie value) { return new MovieSummary()
+                .id(value.getId())
+                .title(value.getTitle())
+                .durationMinutes(value.getDurationMinutes())
+                .language(value.getLanguage()); }
 
     public record DayRange(Instant start, Instant end) { }
 }

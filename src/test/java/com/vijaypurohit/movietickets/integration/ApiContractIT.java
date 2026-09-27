@@ -130,11 +130,11 @@ class ApiContractIT extends ApiIntegrationTest {
                 .isTrue();
     }
 
-    private Map<String, Set<String>> actualOperations(com.fasterxml.jackson.databind.JsonNode paths) {
+    private Map<String, Set<String>> actualOperations(tools.jackson.databind.JsonNode paths) {
         Map<String, Set<String>> actual = new TreeMap<>();
         paths.properties().forEach(entry -> {
             Set<String> methods = new java.util.TreeSet<>();
-            entry.getValue().fieldNames().forEachRemaining(name -> {
+            entry.getValue().propertyNames().forEach(name -> {
                 if (HTTP_METHODS.contains(name)) methods.add(name);
             });
             actual.put(entry.getKey(), methods);
@@ -142,7 +142,7 @@ class ApiContractIT extends ApiIntegrationTest {
         return actual;
     }
 
-    private void assertParameterReferences(com.fasterxml.jackson.databind.JsonNode paths,
+    private void assertParameterReferences(tools.jackson.databind.JsonNode paths,
             String path, String method, String... componentNames) {
         var parameters = paths.get(path).get(method).get("parameters");
         Set<String> references = new java.util.HashSet<>();

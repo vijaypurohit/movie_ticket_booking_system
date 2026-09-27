@@ -69,7 +69,7 @@ Pagination follows the access pattern instead of forcing one mechanism on every 
 | Database | PostgreSQL | ACID transactions, row locks, constraints, and relational queries fit seat booking |
 | Migrations | Flyway | Reviewable schema changes; Hibernate validates rather than creates schema |
 | Persistence | Spring Data JPA with explicit locking queries | Fast CRUD development with control over contested queries |
-| API contract | springdoc-openapi | Generates OpenAPI from implemented controllers and DTOs |
+| API contract | OpenAPI 3.1 specification + openapi-generator-maven-plugin | Contract-first: request/response models and controller interfaces are generated from the checked-in specification |
 | Tests | JUnit 5 and Testcontainers PostgreSQL | Exercises the database behavior used by the application |
 | External integrations | Local gateway adapters | Deterministic payment and notification behavior without credentials or network access |
 
@@ -234,7 +234,31 @@ Only the listed transitions are permitted. Retrying a completed idempotent opera
 
 ## 9. OpenAPI REST Contract
 
-All APIs use JSON. springdoc-openapi exposes `/v3/api-docs` and `/swagger-ui.html`. The generated contract documents authentication, validation, pagination, `Idempotency-Key`, status codes, and error schemas, and is verified by integration tests.
+All APIs use JSON. The contract is the checked-in specification at `src/main/resources/openapi/openapi.yaml`, served verbatim at `/v3/api-docs` (and `/v3/api-docs.yaml`) with Swagger UI at `/swagger-ui.html`. `openapi-generator-maven-plugin` generates the request/response models and one controller interface per tag from it during `generate-sources`; each controller implements its interface, so an implementation that diverges from the specification fails to compile. The document covers authentication, validation, pagination, `Idempotency-Key`, status codes and error schemas, and is verified by integration tests.
+
+### Generator configuration
+
+`openapi-generator-maven-plugin` runs with `generatorName=spring`, `interfaceOnly=true` and
+`useTags=true`, producing 52 models and 8 controller interfaces — one per tag, matching the
+eight controllers. Three mappings keep the generated code aligned with the domain:
+
+| Concern | Configuration | Why |
+|---|---|---|
+| Domain enums | `schemaMappings` for the nine enum schemas | The generator reuses `SeatCategory`, `BookingState` and the rest from `model` instead of minting parallel copies, so no conversion code is needed at the boundary. |
+| Instants | `typeMappings: OffsetDateTime=java.time.Instant` | The rest of the codebase stores and reasons in `Instant`. |
+| `@Digits` | `x-field-extra-annotation` on money fields | OpenAPI has no equivalent, so the scale constraint is carried through explicitly rather than silently lost. |
+
+Two constraints are deliberately **not** expressed as generated bean validation:
+
+- Page and cursor bounds carry no `minimum`/`maximum`. `PageLimits` is the single place that
+  enforces them, so an out-of-range page keeps returning the documented `INVALID_PAGE`
+  rather than a generic `INVALID_REQUEST` from a constraint violation.
+- `204` responses declare an empty `application/json` content. Without it the generator
+  derives `produces` purely from the `problem+json` error responses, and a client sending
+  `Accept: application/json` receives `406` on an endpoint that succeeds with no body.
+
+Generated sources live in `target/generated-sources/openapi` and are never edited or
+committed; the specification is changed and the build regenerates them.
 
 ### Public and customer APIs
 

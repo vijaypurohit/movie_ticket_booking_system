@@ -16,10 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
 import com.vijaypurohit.movietickets.booking.model.Booking;
 import com.vijaypurohit.movietickets.booking.model.BookingItem;
 import com.vijaypurohit.movietickets.booking.persistence.BookingRepository;
-import com.vijaypurohit.movietickets.booking.web.BookingRequests.CreateBookingRequest;
-import com.vijaypurohit.movietickets.booking.web.BookingResponses.BookingResponse;
-import com.vijaypurohit.movietickets.booking.web.BookingResponses.ItemResponse;
-import com.vijaypurohit.movietickets.booking.web.BookingResponses.RefundSummary;
+import com.vijaypurohit.movietickets.generated.model.CreateBookingRequest;
+import com.vijaypurohit.movietickets.generated.model.BookingResponse;
+import com.vijaypurohit.movietickets.generated.model.ItemResponse;
+import com.vijaypurohit.movietickets.generated.model.RefundSummary;
 import com.vijaypurohit.movietickets.identity.application.CurrentUserProvider;
 import com.vijaypurohit.movietickets.payment.PaymentGateway;
 import com.vijaypurohit.movietickets.payment.model.Payment;
@@ -54,9 +54,9 @@ public class BookingService {
 
     public BookingResponse create(String idempotencyKey, CreateBookingRequest request) {
         UUID customerId = users.requireCustomerId();
-        var prepared = transactions.prepare(customerId, idempotencyKey, request.reservationId(), request.discountCode());
+        var prepared = transactions.prepare(customerId, idempotencyKey, request.getReservationId(), request.getDiscountCode());
         if (prepared.requiresCharge()) {
-            var result = gateway.charge(prepared.gatewayKey(), prepared.amount(), request.paymentToken());
+            var result = gateway.charge(prepared.gatewayKey(), prepared.amount(), request.getPaymentToken());
             transactions.finalizePayment(prepared.bookingId(), result);
         }
         return get(prepared.bookingId());
@@ -105,14 +105,32 @@ public class BookingService {
     private BookingResponse response(Booking booking, Payment payment, List<Refund> refundValues) {
         List<ItemResponse> items = booking.getItems().stream()
                 .sorted(Comparator.comparing(BookingItem::getRowLabel).thenComparingInt(BookingItem::getSeatNumber))
-                .map(item -> new ItemResponse(item.getScreeningSeatId(), item.getRowLabel(), item.getSeatNumber(),
-                        item.getCategory(), item.getUnitPrice()))
+                .map(item -> new ItemResponse()
+                .screeningSeatId(item.getScreeningSeatId())
+                .rowLabel(item.getRowLabel())
+                .seatNumber(item.getSeatNumber())
+                .category(item.getCategory())
+                .unitPrice(item.getUnitPrice()))
                 .toList();
         List<RefundSummary> refundSummaries = refundValues.stream()
-                .map(refund -> new RefundSummary(refund.getId(), refund.getReason(), refund.getStatus(), refund.getAmount()))
+                .map(refund -> new RefundSummary()
+                .id(refund.getId())
+                .reason(refund.getReason())
+                .status(refund.getStatus())
+                .amount(refund.getAmount()))
                 .toList();
-        return new BookingResponse(booking.getId(), booking.getReference(), booking.getScreeningId(),
-                booking.getState(), items, booking.getSubtotal(), booking.getDiscountAmount(),
-                booking.getTotalAmount(), booking.getCurrency(), payment.getStatus(), refundSummaries, booking.getCreatedAt());
+        return new BookingResponse()
+                .id(booking.getId())
+                .reference(booking.getReference())
+                .screeningId(booking.getScreeningId())
+                .state(booking.getState())
+                .items(items)
+                .subtotal(booking.getSubtotal())
+                .discountAmount(booking.getDiscountAmount())
+                .totalAmount(booking.getTotalAmount())
+                .currency(booking.getCurrency())
+                .paymentStatus(payment.getStatus())
+                .refunds(refundSummaries)
+                .createdAt(booking.getCreatedAt());
     }
 }

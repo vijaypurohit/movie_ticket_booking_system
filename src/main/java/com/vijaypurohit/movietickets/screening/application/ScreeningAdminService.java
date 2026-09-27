@@ -22,9 +22,9 @@ import com.vijaypurohit.movietickets.pricing.application.PricingLookupService;
 import com.vijaypurohit.movietickets.screening.model.Screening;
 import com.vijaypurohit.movietickets.screening.model.ScreeningStatus;
 import com.vijaypurohit.movietickets.screening.persistence.ScreeningRepository;
-import com.vijaypurohit.movietickets.screening.web.ScreeningRequests.CreateScreeningRequest;
-import com.vijaypurohit.movietickets.screening.web.ScreeningResponses.ScreeningPriceResponse;
-import com.vijaypurohit.movietickets.screening.web.ScreeningResponses.ScreeningResponse;
+import com.vijaypurohit.movietickets.generated.model.CreateScreeningRequest;
+import com.vijaypurohit.movietickets.generated.model.ScreeningPriceResponse;
+import com.vijaypurohit.movietickets.generated.model.ScreeningResponse;
 import com.vijaypurohit.movietickets.shared.error.BusinessRuleViolationException;
 import com.vijaypurohit.movietickets.shared.error.ConflictException;
 import com.vijaypurohit.movietickets.shared.error.ResourceNotFoundException;
@@ -53,16 +53,16 @@ public class ScreeningAdminService {
     @Transactional
     public ScreeningResponse create(CreateScreeningRequest request) {
         validateInterval(request);
-        var auditorium = catalog.lockActiveAuditorium(request.auditoriumId());
+        var auditorium = catalog.lockActiveAuditorium(request.getAuditoriumId());
         if (auditorium.seats().isEmpty()) throw violation("EMPTY_SEAT_LAYOUT", "The auditorium has no active seats.");
-        catalog.requireActiveMovie(request.movieId());
-        var plan = pricing.requireActivePricingPlan(request.pricingPlanId());
-        pricing.requireActiveRefundPolicy(request.refundPolicyId());
-        if (screenings.existsOverlap(request.auditoriumId(), request.startTime(), request.endTime(), ScreeningStatus.ACTIVE)) {
+        catalog.requireActiveMovie(request.getMovieId());
+        var plan = pricing.requireActivePricingPlan(request.getPricingPlanId());
+        pricing.requireActiveRefundPolicy(request.getRefundPolicyId());
+        if (screenings.existsOverlap(request.getAuditoriumId(), request.getStartTime(), request.getEndTime(), ScreeningStatus.ACTIVE)) {
             throw new ConflictException("screening-overlap", "Screening overlap", "SCREENING_OVERLAP", "The auditorium already has a screening in this time range.");
         }
-        Screening screening = new Screening(ids.nextId(), request.movieId(), request.auditoriumId(),
-                request.pricingPlanId(), request.refundPolicyId(), request.startTime(), request.endTime());
+        Screening screening = new Screening(ids.nextId(), request.getMovieId(), request.getAuditoriumId(),
+                request.getPricingPlanId(), request.getRefundPolicyId(), request.getStartTime(), request.getEndTime());
         screening.addPrice(ids.nextId(), SeatCategory.REGULAR, price(plan.regularPrice(), plan.weekendAdjustment(), request, auditorium));
         screening.addPrice(ids.nextId(), SeatCategory.PREMIUM, price(plan.premiumPrice(), plan.weekendAdjustment(), request, auditorium));
         auditorium.seats().forEach(seat -> screening.addSeat(ids.nextId(), seat.id()));
@@ -99,21 +99,35 @@ public class ScreeningAdminService {
     }
 
     private void validateInterval(CreateScreeningRequest request) {
-        if (!request.startTime().isAfter(clock.instant())) throw violation("SCREENING_IN_PAST", "The screening must start in the future.");
-        if (!request.endTime().isAfter(request.startTime())) throw violation("INVALID_SCREENING_INTERVAL", "endTime must be after startTime.");
+        if (!request.getStartTime().isAfter(clock.instant())) throw violation("SCREENING_IN_PAST", "The screening must start in the future.");
+        if (!request.getEndTime().isAfter(request.getStartTime())) throw violation("INVALID_SCREENING_INTERVAL", "endTime must be after startTime.");
     }
     private BigDecimal price(BigDecimal base, BigDecimal adjustment, CreateScreeningRequest request,
             CatalogLookupService.AuditoriumSnapshot auditorium) {
-        return calculator.calculate(base, adjustment, request.startTime(), auditorium.timeZone());
+        return calculator.calculate(base, adjustment, request.getStartTime(), auditorium.timeZone());
     }
     private Screening require(UUID id) { return screenings.findDetailedById(id).orElseThrow(() -> new ResourceNotFoundException("not-found", "Screening not found", "RESOURCE_NOT_FOUND", "The requested resource was not found.")); }
     private BusinessRuleViolationException violation(String code, String detail) { return new BusinessRuleViolationException("screening-rule", "Screening rule violation", code, detail); }
     private ScreeningResponse response(Screening screening) {
         List<ScreeningPriceResponse> prices = screening.getPrices().stream()
                 .sorted(Comparator.comparing(price -> price.getSeatCategory().name()))
-                .map(price -> new ScreeningPriceResponse(price.getSeatCategory(), price.getAmount(), price.getCurrency())).toList();
-        return new ScreeningResponse(screening.getId(), screening.getMovieId(), screening.getAuditoriumId(),
-                screening.getPricingPlanId(), screening.getRefundPolicyId(), screening.getStartTime(), screening.getEndTime(),
-                screening.getStatus(), prices, screening.getSeats().size(), screening.getCreatedAt(), screening.getUpdatedAt(), screening.getVersion());
+                .map(price -> new ScreeningPriceResponse()
+                .seatCategory(price.getSeatCategory())
+                .amount(price.getAmount())
+                .currency(price.getCurrency())).toList();
+        return new ScreeningResponse()
+                .id(screening.getId())
+                .movieId(screening.getMovieId())
+                .auditoriumId(screening.getAuditoriumId())
+                .pricingPlanId(screening.getPricingPlanId())
+                .refundPolicyId(screening.getRefundPolicyId())
+                .startTime(screening.getStartTime())
+                .endTime(screening.getEndTime())
+                .status(screening.getStatus())
+                .prices(prices)
+                .inventorySize(screening.getSeats().size())
+                .createdAt(screening.getCreatedAt())
+                .updatedAt(screening.getUpdatedAt())
+                .version(screening.getVersion());
     }
 }

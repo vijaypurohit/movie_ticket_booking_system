@@ -19,10 +19,10 @@ import com.vijaypurohit.movietickets.screening.model.ScreeningSeatState;
 import com.vijaypurohit.movietickets.screening.model.ScreeningStatus;
 import com.vijaypurohit.movietickets.screening.persistence.ScreeningRepository;
 import com.vijaypurohit.movietickets.screening.persistence.ScreeningSeatRepository;
-import com.vijaypurohit.movietickets.screening.web.ScreeningBrowseResponses.PriceSummary;
-import com.vijaypurohit.movietickets.screening.web.ScreeningBrowseResponses.ScreeningDetails;
-import com.vijaypurohit.movietickets.screening.web.ScreeningBrowseResponses.ScreeningSummary;
-import com.vijaypurohit.movietickets.screening.web.ScreeningBrowseResponses.SeatAvailability;
+import com.vijaypurohit.movietickets.generated.model.PriceSummary;
+import com.vijaypurohit.movietickets.generated.model.ScreeningDetails;
+import com.vijaypurohit.movietickets.generated.model.ScreeningSummary;
+import com.vijaypurohit.movietickets.generated.model.SeatAvailability;
 import com.vijaypurohit.movietickets.shared.error.ResourceNotFoundException;
 import com.vijaypurohit.movietickets.shared.pagination.CursorCodec;
 import com.vijaypurohit.movietickets.shared.pagination.CursorPageResponse;
@@ -70,18 +70,31 @@ public class ScreeningBrowseService {
         Screening screening = requireActive(id);
         List<PriceSummary> prices = screening.getPrices().stream()
                 .sorted(Comparator.comparing(price -> price.getSeatCategory().name()))
-                .map(price -> new PriceSummary(price.getSeatCategory(), price.getAmount(), price.getCurrency())).toList();
-        return new ScreeningDetails(screening.getId(), screening.getMovieId(), screening.getAuditoriumId(),
-                screening.getStartTime(), screening.getEndTime(), prices, screening.getSeats().size());
+                .map(price -> new PriceSummary()
+                .category(price.getSeatCategory())
+                .amount(price.getAmount())
+                .currency(price.getCurrency())).toList();
+        return new ScreeningDetails()
+                .id(screening.getId())
+                .movieId(screening.getMovieId())
+                .auditoriumId(screening.getAuditoriumId())
+                .startTime(screening.getStartTime())
+                .endTime(screening.getEndTime())
+                .prices(prices)
+                .inventorySize(screening.getSeats().size());
     }
 
     @Transactional(readOnly = true)
     public List<SeatAvailability> seats(UUID screeningId) {
         requireActive(screeningId);
         return seats.findAvailability(screeningId, clock.instant()).stream()
-                .map(value -> new SeatAvailability(value.getId(), value.getSeatId(), value.getRowLabel(),
-                        value.getSeatNumber(), SeatCategory.valueOf(value.getCategory()),
-                        ScreeningSeatState.valueOf(value.getState())))
+                .map(value -> new SeatAvailability()
+                .screeningSeatId(value.getId())
+                .seatId(value.getSeatId())
+                .rowLabel(value.getRowLabel())
+                .seatNumber(value.getSeatNumber())
+                .category(SeatCategory.valueOf(value.getCategory()))
+                .state(ScreeningSeatState.valueOf(value.getState())))
                 .toList();
     }
 
@@ -89,5 +102,10 @@ public class ScreeningBrowseService {
         return screenings.findDetailedById(id).filter(value -> value.getStatus() == ScreeningStatus.ACTIVE)
                 .orElseThrow(() -> new ResourceNotFoundException("not-found", "Screening not found", "RESOURCE_NOT_FOUND", "The requested screening was not found."));
     }
-    private ScreeningSummary summary(Screening value) { return new ScreeningSummary(value.getId(), value.getMovieId(), value.getAuditoriumId(), value.getStartTime(), value.getEndTime()); }
+    private ScreeningSummary summary(Screening value) { return new ScreeningSummary()
+                .id(value.getId())
+                .movieId(value.getMovieId())
+                .auditoriumId(value.getAuditoriumId())
+                .startTime(value.getStartTime())
+                .endTime(value.getEndTime()); }
 }

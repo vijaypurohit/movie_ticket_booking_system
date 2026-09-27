@@ -29,17 +29,17 @@ Everything else — the four-minute hold, the separate checkout lease, the compe
 
 ## 1. Technology and why
 
-| Concern | Choice | Why this one |
-|---|---|---|
-| Runtime | Java 21 | Current LTS; virtual threads make the concurrency tests cheap to write |
-| Framework | Spring Boot 4.1 | REST, validation, security, transactions and scheduling in one dependency set |
-| Build | Maven Wrapper | No local Maven install; one reproducible command |
-| Database | PostgreSQL 15+ | `SELECT … FOR UPDATE`, `SKIP LOCKED`, check constraints and real transaction semantics *are* the booking contract |
-| Migrations | Flyway | Reviewable, ordered schema changes; Hibernate is set to `validate`, never `create` |
-| Persistence | Spring Data JPA + explicit locking queries | Fast CRUD, with hand-written queries wherever a lock or a lock order matters |
-| API docs | springdoc-openapi | The contract is generated from the code, so it cannot drift |
-| Errors | RFC 9457 Problem Details | One machine-readable error shape across every endpoint |
-| Tests | JUnit 5, AssertJ, Testcontainers PostgreSQL | Tests run against the same engine as production |
+| Concern     | Choice                                      | Why this one                                                                                                      |
+|-------------|---------------------------------------------|-------------------------------------------------------------------------------------------------------------------|
+| Runtime     | Java 21                                     | Current LTS; virtual threads make the concurrency tests cheap to write                                            |
+| Framework   | Spring Boot 4.1                             | REST, validation, security, transactions and scheduling in one dependency set                                     |
+| Build       | Maven Wrapper                               | No local Maven install; one reproducible command                                                                  |
+| Database    | PostgreSQL 15+                              | `SELECT … FOR UPDATE`, `SKIP LOCKED`, check constraints and real transaction semantics *are* the booking contract |
+| Migrations  | Flyway                                      | Reviewable, ordered schema changes; Hibernate is set to `validate`, never `create`                                |
+| Persistence | Spring Data JPA + explicit locking queries  | Fast CRUD, with hand-written queries wherever a lock or a lock order matters                                      |
+| API contract| OpenAPI 3.1 spec + openapi-generator        | Contract-first: `openapi.yaml` is the source of truth and the models and controller interfaces are generated from it, so a mismatch is a compile error |
+| Errors      | RFC 9457 Problem Details                    | One machine-readable error shape across every endpoint                                                            |
+| Tests       | JUnit 5, AssertJ, Testcontainers PostgreSQL | Tests run against the same engine as production                                                                   |
 
 Two choices are worth defending explicitly:
 
@@ -132,13 +132,16 @@ CREATE DATABASE movie_tickets OWNER movie_tickets;
 cp .env.example .env
 ```
 
-Edit `.env` and set two values:
+Edit `.env` and set the two required values:
 
 ```properties
 DB_PASSWORD=the-password-you-just-chose
 CURSOR_SIGNING_KEY=at-least-32-random-characters-goes-here
-APP_DEMO_ENABLED=true
 ```
+
+Those are the only two. The demo dataset is switched on by the `demo` profile in Step 3, so
+`APP_DEMO_ENABLED` does not belong in `.env` — set it there only if you want demo data without
+running under that profile.
 
 `CURSOR_SIGNING_KEY` must be at least 32 UTF-8 bytes — the application refuses to start otherwise, because pagination cursors are HMAC-signed to stop clients forging them. `.env` is gitignored; never commit it.
 
@@ -156,13 +159,31 @@ Flyway applies `V1`–`V9` on startup, Hibernate then validates that the mapped 
 curl -s localhost:8080/api/v1/cities | head -c 200
 ```
 
-You should see `Codex Demo Pune`. Then open **http://localhost:8080/swagger-ui.html** — every endpoint below is executable from there.
+You should see `Demo Pune`. Then open **http://localhost:8080/swagger-ui.html** — every endpoint below is executable from there.
 
 ---
 
 ## 5. Demo data reference
 
-With `APP_DEMO_ENABLED=true`, the seeder creates this exact dataset. It uses deterministic IDs, so restarting the app never duplicates it.
+### Which dataset you get
+
+A Spring profile here is nothing but a named bundle of `app.demo.*` properties — there is no
+behaviour in the profile itself, so setting the properties directly is exactly equivalent.
+
+| To get | Run with | Which sets |
+|---|---|---|
+| Small demo dataset | `--spring.profiles.active=demo` | `app.demo.enabled=true` |
+| Same, without a profile | `APP_DEMO_ENABLED=true` | the same single property |
+| Large dataset | `--spring.profiles.active=capacity` | `enabled` + `large-enabled` + a fixed `anchor-date` |
+| Large dataset **with** booking history | the `capacity` profile **plus** `APP_DEMO_HISTORY_ENABLED=true` | adds `history-enabled` |
+
+`app.demo.enabled` seeds the three accounts and selects a data seeder;
+`app.demo.large-enabled` decides which one runs. The two datasets are mutually exclusive:
+with `large-enabled=true` the small seeder backs off.
+
+The seeders are idempotent and use deterministic identifiers, so restarting never duplicates
+anything. The small dataset is what the rest of this section describes.
+
 
 **Accounts**
 
@@ -176,8 +197,8 @@ With `APP_DEMO_ENABLED=true`, the seeder creates this exact dataset. It uses det
 
 | Thing | Value |
 |---|---|
-| City | Codex Demo Pune (India, `Asia/Kolkata`) |
-| Theater | Codex Demo Cinema, Baner, Pune |
+| City | Demo Pune (India, `Asia/Kolkata`) |
+| Theater | Demo Cinema, Baner, Pune |
 | Auditorium | Screen 1 |
 | Seats | `A1`, `A2` (REGULAR) · `B1`, `B2` (PREMIUM) — **4 seats total** |
 | Movie | The Last Commit, 120 min, English |
@@ -200,15 +221,46 @@ With `APP_DEMO_ENABLED=true`, the seeder creates this exact dataset. It uses det
 
 **Payment tokens** — `tok_success` succeeds; `tok_decline` and anything else declines. Tokens are never stored or logged.
 
-> **Note:** the demo seeder does **not** create a discount code. To demo discounts, create one first — see [§7](#7-exercising-edge-cases-by-hand).
+**Discount codes** — both seeded, so discounts need no admin setup:
+
+| Code | Effect | Limits | Demonstrates |
+|---|---|---|---|
+| `DEMO10` | 10% off, capped at ₹100 | min spend ₹100, 5 per customer | the happy path, reusable |
+| `DEMO50` | flat ₹50 off | min spend ₹100, **one use in total** | `422 DISCOUNT_LIMIT_REACHED` on the second redemption |
+
+Pass either as `"discountCode"` in the booking body. `DemoDatasetIT` covers both paths.
 
 ### Larger dataset
+
+Catalog only — 3 cities, 10 theaters, 30 auditoriums, 4,500 physical seats, 20 movies,
+840 screenings and ~126,000 screening-seat rows:
 
 ```bash
 JAVA_HOME=/path/to/jdk-21 ./mvnw spring-boot:run -Dspring-boot.run.profiles=capacity
 ```
 
-Generates 3 cities, 10 theaters, 30 auditoriums, 4,500 physical seats, 20 movies, 840 screenings and ~126,000 screening-seat rows. Add `APP_DEMO_HISTORY_ENABLED=true` for 1,000 customers and 10,000 bookings (`capacity.customer.0000@movietickets.local` … `0997`, password `Capacity@123`). Use this to see that pagination, indexes and worker batches stay bounded on a realistic dataset.
+Add booking history — 1,000 customers and 10,000 bookings on top:
+
+```bash
+JAVA_HOME=/path/to/jdk-21 APP_DEMO_HISTORY_ENABLED=true \
+  ./mvnw spring-boot:run -Dspring-boot.run.profiles=capacity
+```
+
+History logins are `capacity.customer.0000@movietickets.local` … `0997`, password
+`Capacity@123`. The generator writes in batches and takes roughly 15 seconds; it is
+idempotent, so a restart does not regenerate it.
+
+Because the `capacity` profile pins `app.demo.anchor-date` (default `2030-01-07`), its
+screenings sit at a fixed future date rather than relative to today. Browse them with that
+date, not tomorrow's:
+
+```bash
+curl -s "localhost:8080/api/v1/cities" | jq -r '.items[0].id'
+curl -s "localhost:8080/api/v1/screenings?cityId=<id>&date=2030-01-07&limit=5" | jq
+```
+
+Use this dataset to see that pagination, indexes and worker batches stay bounded. It is a
+functional check, not a throughput benchmark.
 
 ---
 
@@ -402,8 +454,30 @@ Shortening the durations is the intended way to demonstrate expiry without waiti
 
 ## 9. API surface
 
+This API is **contract-first**. [`src/main/resources/openapi/openapi.yaml`](src/main/resources/openapi/openapi.yaml)
+is the source of truth — 32 paths, 60 operations, 61 schemas — and is served verbatim
+rather than reconstructed from the running code.
+
 - **Swagger UI** — http://localhost:8080/swagger-ui.html
 - **OpenAPI JSON** — http://localhost:8080/v3/api-docs
+- **OpenAPI YAML** — http://localhost:8080/v3/api-docs.yaml
+
+### Changing the API
+
+The build generates the request/response models and one controller interface per tag from
+the specification into `target/generated-sources/openapi`. Each controller implements its
+interface, so **an implementation that drifts from the specification does not compile**.
+
+```bash
+# 1. edit src/main/resources/openapi/openapi.yaml
+# 2. regenerate and let the compiler tell you what no longer matches
+JAVA_HOME=/path/to/jdk-21 ./mvnw generate-sources
+JAVA_HOME=/path/to/jdk-21 ./mvnw compile
+```
+
+Never edit anything under `target/generated-sources` — it is overwritten on every build.
+[docs/DESIGN.md §9](docs/DESIGN.md) explains the generator configuration and the type
+mappings it relies on.
 
 | Access | Endpoints |
 |---|---|
@@ -457,9 +531,10 @@ JAVA_HOME=/path/to/jdk-21 ./mvnw clean verify
 | `RefundWorkerIT` | 4 | Refund success, retryable-then-success, terminal stop, attempt-limit exhaustion |
 | `ShowCancellationIT` | 5 | Admin show cancellation, full refund, idempotency, sweeper recovery, started-show rejection |
 | `BookingJourneysIT` | 4 | End-to-end: discounted booking → history → cancellation → refund → seat reuse; expiry; decline; reminders |
+| `DemoDatasetIT` | 3 | The seeded demo dataset: catalog and a week of screenings, the `DEMO10` discount, `DEMO50` single-use rejection, seeder idempotency |
 | `CapacityDatasetIT` | 1 | 126,000 seat rows, cursor paging through 10,000 bookings, bounded worker batches |
 
-**Latest run: 49 tests — 21 unit/context, 28 integration — 0 failures, 0 errors, 0 skips**, on the default Testcontainer.
+**Latest run: 52 tests — 21 unit/context, 31 integration — 0 failures, 0 errors, 0 skips**, on the default Testcontainer.
 
 ---
 
@@ -504,4 +579,4 @@ No external skill package or app connector was used; this was repository-native 
 
 ---
 
-**Further reading:** [docs/DESIGN.md](docs/DESIGN.md) for the full design and trade-offs · [docs/DEMO_WORKFLOW.md](docs/DEMO_WORKFLOW.md) for the Swagger-only script.
+**Further reading:** [docs/DESIGN.md](docs/DESIGN.md) for the full design and trade-offs.

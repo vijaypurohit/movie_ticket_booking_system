@@ -18,7 +18,7 @@ import com.vijaypurohit.movietickets.payment.PaymentGateway.RefundResult;
 import com.vijaypurohit.movietickets.payment.model.Refund;
 import com.vijaypurohit.movietickets.payment.model.RefundStatus;
 import com.vijaypurohit.movietickets.payment.persistence.RefundRepository;
-import com.vijaypurohit.movietickets.payment.web.RefundResponses.RefundResponse;
+import com.vijaypurohit.movietickets.generated.model.RefundResponse;
 import com.vijaypurohit.movietickets.shared.error.ResourceNotFoundException;
 import com.vijaypurohit.movietickets.shared.identifier.IdGenerator;
 
@@ -72,8 +72,13 @@ public class RefundService {
     }
 
     private RefundResponse response(Refund refund) {
-        return new RefundResponse(refund.getId(), refund.getBookingId(), refund.getReason(), refund.getStatus(),
-                refund.getAmount(), refund.getCurrency());
+        return new RefundResponse()
+                .id(refund.getId())
+                .bookingId(refund.getBookingId())
+                .reason(refund.getReason())
+                .status(refund.getStatus())
+                .amount(refund.getAmount())
+                .currency(refund.getCurrency());
     }
     public record RefundWork(UUID id, String idempotencyKey, java.math.BigDecimal amount) { }
 }

@@ -3,6 +3,8 @@ package com.vijaypurohit.movietickets.demo.application;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -27,8 +29,11 @@ import com.vijaypurohit.movietickets.catalog.persistence.CityRepository;
 import com.vijaypurohit.movietickets.catalog.persistence.MovieRepository;
 import com.vijaypurohit.movietickets.catalog.persistence.SeatRepository;
 import com.vijaypurohit.movietickets.catalog.persistence.TheaterRepository;
+import com.vijaypurohit.movietickets.pricing.model.DiscountCode;
+import com.vijaypurohit.movietickets.pricing.model.DiscountType;
 import com.vijaypurohit.movietickets.pricing.model.PricingPlan;
 import com.vijaypurohit.movietickets.pricing.model.RefundPolicy;
+import com.vijaypurohit.movietickets.pricing.persistence.DiscountCodeRepository;
 import com.vijaypurohit.movietickets.pricing.persistence.PricingPlanRepository;
 import com.vijaypurohit.movietickets.pricing.persistence.RefundPolicyRepository;
 import com.vijaypurohit.movietickets.screening.model.Screening;
@@ -43,39 +48,65 @@ public class LocalDemoDataSeeder implements ApplicationRunner {
     private final AuditoriumRepository auditoriums; private final SeatRepository seats;
     private final MovieRepository movies; private final PricingPlanRepository pricingPlans;
     private final RefundPolicyRepository refundPolicies; private final ScreeningRepository screenings;
+    private final DiscountCodeRepository discountCodes;
     private final Clock clock;
 
     public LocalDemoDataSeeder(CityRepository cities, TheaterRepository theaters,
             AuditoriumRepository auditoriums, SeatRepository seats, MovieRepository movies,
             PricingPlanRepository pricingPlans, RefundPolicyRepository refundPolicies,
-            ScreeningRepository screenings, Clock clock) {
+            ScreeningRepository screenings, DiscountCodeRepository discountCodes, Clock clock) {
         this.cities=cities; this.theaters=theaters; this.auditoriums=auditoriums; this.seats=seats;
         this.movies=movies; this.pricingPlans=pricingPlans; this.refundPolicies=refundPolicies;
-        this.screenings=screenings; this.clock=clock;
+        this.screenings=screenings; this.discountCodes=discountCodes; this.clock=clock;
     }
 
     @Override @Transactional
     public void run(ApplicationArguments arguments) {
-        City city = cities.findById(id("city")).orElseGet(() -> cities.save(new City(id("city"), "Codex Demo Pune", "India", ZONE.getId())));
-        Theater theater = theaters.findById(id("theater")).orElseGet(() -> theaters.save(new Theater(id("theater"), city, "Codex Demo Cinema", "Baner, Pune")));
+        City city = cities.findById(id("city")).orElseGet(() -> cities.save(new City(id("city"), "Demo Pune", "India", ZONE.getId())));
+        Theater theater = theaters.findById(id("theater")).orElseGet(() -> theaters.save(new Theater(id("theater"), city, "Demo Cinema", "Baner, Pune")));
         Auditorium auditorium = auditoriums.findById(id("auditorium")).orElseGet(() -> auditoriums.save(new Auditorium(id("auditorium"), theater, "Screen 1")));
         List<Seat> demoSeats = List.of(
                 seat(auditorium, "A", 1, SeatCategory.REGULAR), seat(auditorium, "A", 2, SeatCategory.REGULAR),
                 seat(auditorium, "B", 1, SeatCategory.PREMIUM), seat(auditorium, "B", 2, SeatCategory.PREMIUM));
         Movie movie = movies.findById(id("movie")).orElseGet(() -> movies.save(new Movie(id("movie"), "The Last Commit", 120, "English")));
         PricingPlan plan = pricingPlans.findById(id("pricing")).orElseGet(() -> pricingPlans.save(
-                new PricingPlan(id("pricing"), "Codex Demo Pricing", new BigDecimal("250.00"),
+                new PricingPlan(id("pricing"), "Demo Pricing", new BigDecimal("250.00"),
                         new BigDecimal("400.00"), new BigDecimal("50.00"))));
         RefundPolicy policy = refundPolicies.findById(id("refund-policy")).orElseGet(() -> {
-            RefundPolicy value = new RefundPolicy(id("refund-policy"), "Codex Demo Refund Policy");
+            RefundPolicy value = new RefundPolicy(id("refund-policy"), "Demo Refund Policy");
             value.replace(value.getName(), List.of(
                     new RefundPolicy.RuleDefinition(id("refund-rule-1440"), 1440, new BigDecimal("100.00")),
                     new RefundPolicy.RuleDefinition(id("refund-rule-120"), 120, new BigDecimal("50.00")),
                     new RefundPolicy.RuleDefinition(id("refund-rule-0"), 0, new BigDecimal("0.00"))));
             return refundPolicies.save(value);
         });
+        seedDiscountCodes();
         LocalDate firstDay = LocalDate.now(clock.withZone(ZONE)).plusDays(1);
         for (int day = 0; day < 7; day++) createScreening(firstDay.plusDays(day), movie, auditorium, demoSeats, plan, policy);
+    }
+
+    /**
+     * Two codes, so both discount paths are demonstrable without any admin setup:
+     * DEMO10 is reusable for the happy path, DEMO50 is single-use so a second
+     * redemption shows the 422 DISCOUNT_LIMIT_REACHED rule.
+     */
+    private void seedDiscountCodes() {
+        Instant validFrom = clock.instant().minus(Duration.ofDays(1));
+        Instant validUntil = clock.instant().plus(Duration.ofDays(365));
+        discountCode(id("discount-percentage"), "DEMO10", DiscountType.PERCENTAGE,
+                new BigDecimal("10.00"), validFrom, validUntil,
+                new BigDecimal("100.00"), new BigDecimal("100.00"), null, 5);
+        discountCode(id("discount-single-use"), "DEMO50", DiscountType.FIXED,
+                new BigDecimal("50.00"), validFrom, validUntil,
+                new BigDecimal("100.00"), null, 1, 1);
+    }
+
+    private void discountCode(UUID id, String code, DiscountType type, BigDecimal value,
+            Instant validFrom, Instant validUntil, BigDecimal minimumSpend, BigDecimal maximumDiscount,
+            Integer globalUsageLimit, Integer perCustomerUsageLimit) {
+        if (discountCodes.existsById(id)) return;
+        discountCodes.save(new DiscountCode(id, code, type, value, validFrom, validUntil,
+                minimumSpend, maximumDiscount, globalUsageLimit, perCustomerUsageLimit));
     }
 
     private Seat seat(Auditorium auditorium, String row, int number, SeatCategory category) {

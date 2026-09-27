@@ -25,7 +25,8 @@ public class SecurityFoundationConfiguration {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers("/v3/api-docs", "/v3/api-docs.yaml",
+                                "/swagger-ui.html", "/webjars/swagger-ui/**").permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/cities/**",
                                 "/api/v1/theaters/**",

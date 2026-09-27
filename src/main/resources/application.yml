@@ -44,8 +44,8 @@ app:
   pagination:
     cursor-signing-key: ${CURSOR_SIGNING_KEY}
 
-springdoc:
-  api-docs:
-    path: /v3/api-docs
-  swagger-ui:
-    path: /swagger-ui.html
+# The OpenAPI contract is the checked-in specification at
+# classpath:openapi/openapi.yaml, served verbatim by OpenApiDocumentController at
+# /v3/api-docs. Swagger UI is the static page at /swagger-ui.html pointed at that
+# document. Runtime generation from the code is off: the specification is the one
+# source of truth, and the models and controller interfaces are generated from it.

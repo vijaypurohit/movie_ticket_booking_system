@@ -5,44 +5,50 @@ import java.util.UUID;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.vijaypurohit.movietickets.generated.api.AdminScreeningsApi;
+import com.vijaypurohit.movietickets.generated.model.CreateScreeningRequest;
+import com.vijaypurohit.movietickets.generated.model.PageResponseScreeningResponse;
+import com.vijaypurohit.movietickets.generated.model.ScreeningPriceResponse;
+import com.vijaypurohit.movietickets.generated.model.ScreeningResponse;
 import com.vijaypurohit.movietickets.screening.application.ScreeningAdminService;
-import com.vijaypurohit.movietickets.screening.web.ScreeningRequests.CreateScreeningRequest;
-import com.vijaypurohit.movietickets.screening.web.ScreeningResponses.ScreeningPriceResponse;
-import com.vijaypurohit.movietickets.screening.web.ScreeningResponses.ScreeningResponse;
-import com.vijaypurohit.movietickets.shared.pagination.PageResponse;
-import com.vijaypurohit.movietickets.shared.openapi.OpenApiConfiguration;
 
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
-
-@Validated
 @RestController
-@RequestMapping(value = "/admin/api/v1/screenings", produces = MediaType.APPLICATION_JSON_VALUE)
-@Tag(name = "Admin screenings")
-@SecurityRequirement(name = OpenApiConfiguration.BASIC_AUTH_SCHEME)
 @ConditionalOnProperty(prefix = "app.screening", name = "enabled", havingValue = "true", matchIfMissing = true)
-public class ScreeningAdminController {
+public class ScreeningAdminController implements AdminScreeningsApi {
     private final ScreeningAdminService service;
 
     public ScreeningAdminController(ScreeningAdminService service) { this.service = service; }
 
-    @PostMapping @ResponseStatus(HttpStatus.CREATED)
-    public ScreeningResponse create(@Valid @RequestBody CreateScreeningRequest request) { return service.create(request); }
-    @GetMapping("/{id}") public ScreeningResponse get(@PathVariable UUID id) { return service.get(id); }
-    @GetMapping public PageResponse<ScreeningResponse> list(@RequestParam(required = false) UUID auditoriumId, @RequestParam(required = false) UUID movieId, @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) { return service.list(auditoriumId, movieId, page, size); }
-    @GetMapping("/{id}/prices") public List<ScreeningPriceResponse> prices(@PathVariable UUID id) { return service.get(id).prices(); }
-    @DeleteMapping("/{id}") @ResponseStatus(HttpStatus.NO_CONTENT) public void cancel(@PathVariable UUID id) { service.cancel(id); }
+    @Override
+    public ResponseEntity<ScreeningResponse> createScreening(CreateScreeningRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.create(request));
+    }
+
+    @Override
+    public ResponseEntity<ScreeningResponse> getScreening(UUID id) {
+        return ResponseEntity.ok(service.get(id));
+    }
+
+    @Override
+    public ResponseEntity<PageResponseScreeningResponse> listScreenings(
+            UUID auditoriumId, UUID movieId, Integer page, Integer size) {
+        var result = service.list(auditoriumId, movieId, page, size);
+        return ResponseEntity.ok(new PageResponseScreeningResponse()
+                .items(result.items()).page(result.page()).size(result.size())
+                .totalElements(result.totalElements()).totalPages(result.totalPages()));
+    }
+
+    @Override
+    public ResponseEntity<List<ScreeningPriceResponse>> listScreeningPrices(UUID id) {
+        return ResponseEntity.ok(service.get(id).getPrices());
+    }
+
+    @Override
+    public ResponseEntity<Void> cancelScreening(UUID id) {
+        service.cancel(id);
+        return ResponseEntity.noContent().build();
+    }
 }

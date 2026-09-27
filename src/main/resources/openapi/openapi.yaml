@@ -1,0 +1,3366 @@
+# Source of truth for the HTTP contract.
+# Models and controller interfaces are generated from this file by
+# openapi-generator-maven-plugin during generate-sources. Never edit
+# the generated classes -- change this file and rebuild.
+openapi: 3.1.0
+info:
+  title: Movie Ticket Booking API
+  description: 'Browse screenings, reserve seats, complete bookings, cancel bookings, and administer the
+    local catalog. This document is the source of truth: request/response models and the controller interfaces
+    are generated from it at build time.'
+  version: v1
+servers:
+- url: http://localhost:8080
+  description: Local development
+tags:
+- name: Public catalog
+  description: Unauthenticated city, theater, and movie discovery
+- name: Public screenings
+  description: Unauthenticated screening and seat-availability discovery
+- name: Customer reservations
+  description: Customer seat holds and release
+- name: Customer bookings
+  description: Customer checkout, history, and cancellation
+- name: Customer refunds
+  description: Customer refund status
+- name: Admin catalog
+  description: Administrator catalog management
+- name: Admin pricing
+  description: Administrator pricing, discount, and refund-policy management
+- name: Admin screenings
+  description: Administrator screening management
+paths:
+  /admin/api/v1/theaters/{id}:
+    get:
+      tags:
+      - Admin catalog
+      operationId: getTheater
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TheaterResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+      - basicAuth: []
+    put:
+      tags:
+      - Admin catalog
+      operationId: updateTheater
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TheaterRequest'
+            example:
+              name: Central Cinema
+              cityId: 00000000-0000-4000-8000-000000000001
+              address: Baner, Pune
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TheaterResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+    delete:
+      tags:
+      - Admin catalog
+      operationId: deactivateTheater
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: No Content
+          content:
+            application/json: {}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+  /admin/api/v1/seats/{id}:
+    get:
+      tags:
+      - Admin catalog
+      operationId: getSeat
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeatResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+      - basicAuth: []
+    put:
+      tags:
+      - Admin catalog
+      operationId: updateSeat
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SeatRequest'
+            example:
+              rowLabel: A
+              category: REGULAR
+              seatNumber: 1
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeatResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+    delete:
+      tags:
+      - Admin catalog
+      operationId: deactivateSeat
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: No Content
+          content:
+            application/json: {}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+  /admin/api/v1/refund-policies/{id}:
+    get:
+      tags:
+      - Admin pricing
+      operationId: getRefundPolicy
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundPolicyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+      - basicAuth: []
+    put:
+      tags:
+      - Admin pricing
+      operationId: updateRefundPolicy
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefundPolicyRequest'
+            example:
+              name: Standard refund policy
+              rules:
+              - cutoffMinutes: 1440
+                refundPercentage: 100.0
+              - cutoffMinutes: 120
+                refundPercentage: 50.0
+              - cutoffMinutes: 0
+                refundPercentage: 0.0
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundPolicyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+    delete:
+      tags:
+      - Admin pricing
+      operationId: deactivateRefundPolicy
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: No Content
+          content:
+            application/json: {}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+  /admin/api/v1/pricing-plans/{id}:
+    get:
+      tags:
+      - Admin pricing
+      operationId: getPricingPlan
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PricingPlanResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+      - basicAuth: []
+    put:
+      tags:
+      - Admin pricing
+      operationId: updatePricingPlan
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PricingPlanRequest'
+            example:
+              weekendAdjustment: 50.0
+              regularPrice: 250.0
+              premiumPrice: 400.0
+              name: Standard INR
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PricingPlanResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+    delete:
+      tags:
+      - Admin pricing
+      operationId: deactivatePricingPlan
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: No Content
+          content:
+            application/json: {}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+  /admin/api/v1/movies/{id}:
+    get:
+      tags:
+      - Admin catalog
+      operationId: getMovie
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovieResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+      - basicAuth: []
+    put:
+      tags:
+      - Admin catalog
+      operationId: updateMovie
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MovieRequest'
+            example:
+              durationMinutes: 120
+              title: The Last Commit
+              language: English
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovieResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+    delete:
+      tags:
+      - Admin catalog
+      operationId: deactivateMovie
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: No Content
+          content:
+            application/json: {}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+  /admin/api/v1/discount-codes/{id}:
+    get:
+      tags:
+      - Admin pricing
+      operationId: getDiscountCode
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscountCodeResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+      - basicAuth: []
+    put:
+      tags:
+      - Admin pricing
+      operationId: updateDiscountCode
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiscountCodeRequest'
+            example:
+              validUntil: '2030-12-31T23:59:59Z'
+              code: WELCOME10
+              value: 10.0
+              type: PERCENTAGE
+              validFrom: '2030-01-01T00:00:00Z'
+              globalUsageLimit: 1000
+              perCustomerUsageLimit: 1
+              minimumSpend: 200.0
+              maximumDiscount: 100.0
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscountCodeResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+    delete:
+      tags:
+      - Admin pricing
+      operationId: deactivateDiscountCode
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: No Content
+          content:
+            application/json: {}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+  /admin/api/v1/cities/{id}:
+    get:
+      tags:
+      - Admin catalog
+      operationId: getCity
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CityResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+      - basicAuth: []
+    put:
+      tags:
+      - Admin catalog
+      operationId: updateCity
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CityRequest'
+            example:
+              name: Pune
+              timeZone: Asia/Kolkata
+              country: India
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CityResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+    delete:
+      tags:
+      - Admin catalog
+      operationId: deactivateCity
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: No Content
+          content:
+            application/json: {}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+  /admin/api/v1/auditoriums/{id}:
+    get:
+      tags:
+      - Admin catalog
+      operationId: getAuditorium
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditoriumResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+      - basicAuth: []
+    put:
+      tags:
+      - Admin catalog
+      operationId: updateAuditorium
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuditoriumRequest'
+            example:
+              name: Screen 1
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditoriumResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+    delete:
+      tags:
+      - Admin catalog
+      operationId: deactivateAuditorium
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: No Content
+          content:
+            application/json: {}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+  /api/v1/seat-reservations:
+    post:
+      tags:
+      - Customer reservations
+      summary: Reserve one to ten screening seats atomically
+      operationId: createReservation
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        $ref: '#/components/parameters/IdempotencyKey'
+        schema:
+          type: string
+          maxLength: 120
+          minLength: 0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReservationRequest'
+            example:
+              screeningSeatIds:
+              - 00000000-0000-4000-8000-000000000006
+              - 00000000-0000-4000-8000-000000000007
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+  /api/v1/bookings:
+    get:
+      tags:
+      - Customer bookings
+      summary: List owned booking history using an opaque cursor
+      operationId: listBookings
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/CursorLimit'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CursorPageResponseBookingResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      security:
+      - basicAuth: []
+    post:
+      tags:
+      - Customer bookings
+      summary: Pay for a reservation and create a booking
+      operationId: createBooking
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        $ref: '#/components/parameters/IdempotencyKey'
+        schema:
+          type: string
+          maxLength: 120
+          minLength: 0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBookingRequest'
+            example:
+              reservationId: 00000000-0000-4000-8000-000000000008
+              paymentToken: tok_success
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+  /api/v1/bookings/{id}/cancellations:
+    post:
+      tags:
+      - Customer bookings
+      summary: Cancel an owned booking idempotently
+      operationId: cancelBooking
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: true
+        $ref: '#/components/parameters/IdempotencyKey'
+        schema:
+          type: string
+          maxLength: 120
+          minLength: 0
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CancellationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+  /admin/api/v1/theaters:
+    get:
+      tags:
+      - Admin catalog
+      operationId: listTheaters
+      parameters:
+      - name: cityId
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageResponseTheaterResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      security:
+      - basicAuth: []
+    post:
+      tags:
+      - Admin catalog
+      operationId: createTheater
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TheaterRequest'
+            example:
+              name: Central Cinema
+              cityId: 00000000-0000-4000-8000-000000000001
+              address: Baner, Pune
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TheaterResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+  /admin/api/v1/theaters/{theaterId}/auditoriums:
+    get:
+      tags:
+      - Admin catalog
+      operationId: listAuditoriums
+      parameters:
+      - name: theaterId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageResponseAuditoriumResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+      - basicAuth: []
+    post:
+      tags:
+      - Admin catalog
+      operationId: createAuditorium
+      parameters:
+      - name: theaterId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuditoriumRequest'
+            example:
+              name: Screen 1
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditoriumResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+  /admin/api/v1/screenings:
+    get:
+      tags:
+      - Admin screenings
+      operationId: listScreenings
+      parameters:
+      - name: auditoriumId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: movieId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageResponseScreeningResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      security:
+      - basicAuth: []
+    post:
+      tags:
+      - Admin screenings
+      operationId: createScreening
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateScreeningRequest'
+            example:
+              auditoriumId: 00000000-0000-4000-8000-000000000003
+              movieId: 00000000-0000-4000-8000-000000000002
+              pricingPlanId: 00000000-0000-4000-8000-000000000004
+              startTime: '2030-01-07T12:30:00Z'
+              endTime: '2030-01-07T14:30:00Z'
+              refundPolicyId: 00000000-0000-4000-8000-000000000005
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScreeningResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+  /admin/api/v1/refund-policies:
+    get:
+      tags:
+      - Admin pricing
+      operationId: listRefundPolicies
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageResponseRefundPolicyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      security:
+      - basicAuth: []
+    post:
+      tags:
+      - Admin pricing
+      operationId: createRefundPolicy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefundPolicyRequest'
+            example:
+              name: Standard refund policy
+              rules:
+              - cutoffMinutes: 1440
+                refundPercentage: 100.0
+              - cutoffMinutes: 120
+                refundPercentage: 50.0
+              - cutoffMinutes: 0
+                refundPercentage: 0.0
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundPolicyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+  /admin/api/v1/pricing-plans:
+    get:
+      tags:
+      - Admin pricing
+      operationId: listPricingPlans
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageResponsePricingPlanResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      security:
+      - basicAuth: []
+    post:
+      tags:
+      - Admin pricing
+      operationId: createPricingPlan
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PricingPlanRequest'
+            example:
+              weekendAdjustment: 50.0
+              regularPrice: 250.0
+              premiumPrice: 400.0
+              name: Standard INR
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PricingPlanResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+  /admin/api/v1/movies:
+    get:
+      tags:
+      - Admin catalog
+      operationId: listMovies
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageResponseMovieResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      security:
+      - basicAuth: []
+    post:
+      tags:
+      - Admin catalog
+      operationId: createMovie
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MovieRequest'
+            example:
+              durationMinutes: 120
+              title: The Last Commit
+              language: English
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovieResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+  /admin/api/v1/discount-codes:
+    get:
+      tags:
+      - Admin pricing
+      operationId: listDiscountCodes
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageResponseDiscountCodeResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      security:
+      - basicAuth: []
+    post:
+      tags:
+      - Admin pricing
+      operationId: createDiscountCode
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiscountCodeRequest'
+            example:
+              validUntil: '2030-12-31T23:59:59Z'
+              code: WELCOME10
+              value: 10.0
+              type: PERCENTAGE
+              validFrom: '2030-01-01T00:00:00Z'
+              globalUsageLimit: 1000
+              perCustomerUsageLimit: 1
+              minimumSpend: 200.0
+              maximumDiscount: 100.0
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscountCodeResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+  /admin/api/v1/cities:
+    get:
+      tags:
+      - Admin catalog
+      operationId: listCities
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageResponseCityResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      security:
+      - basicAuth: []
+    post:
+      tags:
+      - Admin catalog
+      operationId: createCity
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CityRequest'
+            example:
+              name: Pune
+              timeZone: Asia/Kolkata
+              country: India
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CityResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+  /admin/api/v1/auditoriums/{auditoriumId}/seats:
+    get:
+      tags:
+      - Admin catalog
+      operationId: listSeats
+      parameters:
+      - name: auditoriumId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageResponseSeatResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+      - basicAuth: []
+    post:
+      tags:
+      - Admin catalog
+      operationId: createSeat
+      parameters:
+      - name: auditoriumId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SeatRequest'
+            example:
+              rowLabel: A
+              category: REGULAR
+              seatNumber: 1
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeatResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+  /api/v1/theaters:
+    get:
+      tags:
+      - Public catalog
+      summary: List active theaters in a city
+      operationId: browseTheaters
+      parameters:
+      - name: cityId
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageResponseTheaterSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/seat-reservations/{id}:
+    get:
+      tags:
+      - Customer reservations
+      summary: Get an owned seat reservation
+      operationId: getReservation
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+      - basicAuth: []
+    delete:
+      tags:
+      - Customer reservations
+      summary: Release an owned seat reservation idempotently
+      operationId: releaseReservation
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: No Content
+          content:
+            application/json: {}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+  /api/v1/screenings:
+    get:
+      tags:
+      - Public screenings
+      summary: Browse screenings with an opaque start-time cursor
+      operationId: browseScreenings
+      parameters:
+      - name: cityId
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: movieId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: theaterId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: date
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/CursorLimit'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CursorPageResponseScreeningSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/screenings/{id}:
+    get:
+      tags:
+      - Public screenings
+      summary: Get screening and price details
+      operationId: browseScreening
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScreeningDetails'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/screenings/{id}/seats:
+    get:
+      tags:
+      - Public screenings
+      summary: Get the effective seat availability for a screening
+      operationId: browseScreeningSeats
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SeatAvailability'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/refunds/{id}:
+    get:
+      tags:
+      - Customer refunds
+      summary: Get the state of an owned refund
+      operationId: getRefund
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+      - basicAuth: []
+  /api/v1/movies:
+    get:
+      tags:
+      - Public catalog
+      summary: Browse movies available in a city on a date
+      operationId: browseMovies
+      parameters:
+      - name: cityId
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: date
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageResponseMovieSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/movies/{id}:
+    get:
+      tags:
+      - Public catalog
+      summary: Get public movie details
+      operationId: browseMovie
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovieSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/cities:
+    get:
+      tags:
+      - Public catalog
+      summary: List active cities
+      operationId: browseCities
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageResponseCitySummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/bookings/{id}:
+    get:
+      tags:
+      - Customer bookings
+      summary: Get an owned booking
+      operationId: getBooking
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+      - basicAuth: []
+  /admin/api/v1/screenings/{id}:
+    get:
+      tags:
+      - Admin screenings
+      operationId: getScreening
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScreeningResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+      - basicAuth: []
+    delete:
+      tags:
+      - Admin screenings
+      operationId: cancelScreening
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: No Content
+          content:
+            application/json: {}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessViolation'
+      security:
+      - basicAuth: []
+  /admin/api/v1/screenings/{id}/prices:
+    get:
+      tags:
+      - Admin screenings
+      operationId: listScreeningPrices
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ScreeningPriceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+      - basicAuth: []
+components:
+  schemas:
+    TheaterRequest:
+      type: object
+      properties:
+        cityId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 160
+          minLength: 1
+        address:
+          type: string
+          maxLength: 500
+          minLength: 1
+      required:
+      - address
+      - cityId
+      - name
+    TheaterResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        cityId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        address:
+          type: string
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          format: int64
+    SeatRequest:
+      type: object
+      properties:
+        rowLabel:
+          type: string
+          maxLength: 10
+          minLength: 1
+        seatNumber:
+          type: integer
+          format: int32
+          maximum: 1000
+          minimum: 1
+        category:
+          $ref: '#/components/schemas/SeatCategory'
+      required:
+      - category
+      - rowLabel
+      - seatNumber
+    SeatResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        auditoriumId:
+          type: string
+          format: uuid
+        rowLabel:
+          type: string
+        seatNumber:
+          type: integer
+          format: int32
+        category:
+          $ref: '#/components/schemas/SeatCategory'
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          format: int64
+    RefundPolicyRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 120
+          minLength: 1
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/RefundRuleRequest'
+          maxItems: 20
+          minItems: 1
+      required:
+      - name
+      - rules
+    RefundRuleRequest:
+      type: object
+      properties:
+        cutoffMinutes:
+          type: integer
+          format: int64
+          minimum: 0
+        refundPercentage:
+          type: number
+          maximum: 100.0
+          minimum: 0.0
+          x-field-extra-annotation: '@jakarta.validation.constraints.Digits(integer = 3, fraction = 2)'
+      required:
+      - cutoffMinutes
+      - refundPercentage
+    RefundPolicyResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/RefundRuleResponse'
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          format: int64
+    RefundRuleResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        cutoffMinutes:
+          type: integer
+          format: int64
+        refundPercentage:
+          type: number
+    PricingPlanRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 120
+          minLength: 1
+        regularPrice:
+          type: number
+          minimum: 0.01
+          x-field-extra-annotation: '@jakarta.validation.constraints.Digits(integer = 10, fraction = 2)'
+        premiumPrice:
+          type: number
+          minimum: 0.01
+          x-field-extra-annotation: '@jakarta.validation.constraints.Digits(integer = 10, fraction = 2)'
+        weekendAdjustment:
+          type: number
+          minimum: 0.0
+          x-field-extra-annotation: '@jakarta.validation.constraints.Digits(integer = 10, fraction = 2)'
+      required:
+      - name
+      - premiumPrice
+      - regularPrice
+      - weekendAdjustment
+    PricingPlanResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        regularPrice:
+          type: number
+        premiumPrice:
+          type: number
+        weekendAdjustment:
+          type: number
+        currency:
+          type: string
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          format: int64
+    MovieRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 240
+          minLength: 1
+        durationMinutes:
+          type: integer
+          format: int32
+          maximum: 1440
+          minimum: 1
+        language:
+          type: string
+          maxLength: 80
+          minLength: 1
+      required:
+      - durationMinutes
+      - language
+      - title
+    MovieResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        durationMinutes:
+          type: integer
+          format: int32
+        language:
+          type: string
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          format: int64
+    DiscountCodeRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          maxLength: 40
+          minLength: 1
+        type:
+          $ref: '#/components/schemas/DiscountType'
+        value:
+          type: number
+          minimum: 0.01
+          x-field-extra-annotation: '@jakarta.validation.constraints.Digits(integer = 10, fraction = 2)'
+        validFrom:
+          type: string
+          format: date-time
+        validUntil:
+          type: string
+          format: date-time
+        minimumSpend:
+          type: number
+          minimum: 0.0
+          x-field-extra-annotation: '@jakarta.validation.constraints.Digits(integer = 10, fraction = 2)'
+        maximumDiscount:
+          type: number
+          minimum: 0.01
+          x-field-extra-annotation: '@jakarta.validation.constraints.Digits(integer = 10, fraction = 2)'
+        globalUsageLimit:
+          type: integer
+          format: int32
+          minimum: 1
+        perCustomerUsageLimit:
+          type: integer
+          format: int32
+          minimum: 1
+      required:
+      - code
+      - minimumSpend
+      - type
+      - validFrom
+      - validUntil
+      - value
+    DiscountCodeResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        type:
+          $ref: '#/components/schemas/DiscountType'
+        value:
+          type: number
+        validFrom:
+          type: string
+          format: date-time
+        validUntil:
+          type: string
+          format: date-time
+        minimumSpend:
+          type: number
+        maximumDiscount:
+          type: number
+        globalUsageLimit:
+          type: integer
+          format: int32
+        perCustomerUsageLimit:
+          type: integer
+          format: int32
+        currency:
+          type: string
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          format: int64
+    CityRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 120
+          minLength: 1
+        country:
+          type: string
+          maxLength: 120
+          minLength: 1
+        timeZone:
+          type: string
+          maxLength: 80
+          minLength: 1
+      required:
+      - country
+      - name
+      - timeZone
+    CityResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        country:
+          type: string
+        timeZone:
+          type: string
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          format: int64
+    AuditoriumRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 120
+          minLength: 1
+      required:
+      - name
+    AuditoriumResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        theaterId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          format: int64
+    CreateReservationRequest:
+      type: object
+      properties:
+        screeningSeatIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 10
+          minItems: 1
+      required:
+      - screeningSeatIds
+    ReservationResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        screeningId:
+          type: string
+          format: uuid
+        screeningSeatIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        state:
+          $ref: '#/components/schemas/ReservationState'
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+    CreateBookingRequest:
+      type: object
+      properties:
+        reservationId:
+          type: string
+          format: uuid
+        discountCode:
+          type: string
+          maxLength: 40
+          minLength: 0
+        paymentToken:
+          type: string
+          maxLength: 100
+          minLength: 1
+      required:
+      - paymentToken
+      - reservationId
+    BookingResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        reference:
+          type: string
+        screeningId:
+          type: string
+          format: uuid
+        state:
+          $ref: '#/components/schemas/BookingState'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemResponse'
+        subtotal:
+          type: number
+        discountAmount:
+          type: number
+        totalAmount:
+          type: number
+        currency:
+          type: string
+        paymentStatus:
+          $ref: '#/components/schemas/PaymentStatus'
+        refunds:
+          type: array
+          items:
+            $ref: '#/components/schemas/RefundSummary'
+        createdAt:
+          type: string
+          format: date-time
+    ItemResponse:
+      type: object
+      properties:
+        screeningSeatId:
+          type: string
+          format: uuid
+        rowLabel:
+          type: string
+        seatNumber:
+          type: integer
+          format: int32
+        category:
+          $ref: '#/components/schemas/SeatCategory'
+        unitPrice:
+          type: number
+    RefundSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        reason:
+          $ref: '#/components/schemas/RefundReason'
+        status:
+          $ref: '#/components/schemas/RefundStatus'
+        amount:
+          type: number
+    CancellationResponse:
+      type: object
+      properties:
+        bookingId:
+          type: string
+          format: uuid
+        bookingState:
+          $ref: '#/components/schemas/BookingState'
+        refund:
+          $ref: '#/components/schemas/RefundResponse'
+    RefundResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        bookingId:
+          type: string
+          format: uuid
+        reason:
+          $ref: '#/components/schemas/RefundReason'
+        status:
+          $ref: '#/components/schemas/RefundStatus'
+        amount:
+          type: number
+        currency:
+          type: string
+    CreateScreeningRequest:
+      type: object
+      properties:
+        movieId:
+          type: string
+          format: uuid
+        auditoriumId:
+          type: string
+          format: uuid
+        pricingPlanId:
+          type: string
+          format: uuid
+        refundPolicyId:
+          type: string
+          format: uuid
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+      required:
+      - auditoriumId
+      - endTime
+      - movieId
+      - pricingPlanId
+      - refundPolicyId
+      - startTime
+    ScreeningPriceResponse:
+      type: object
+      properties:
+        seatCategory:
+          $ref: '#/components/schemas/SeatCategory'
+        amount:
+          type: number
+        currency:
+          type: string
+    ScreeningResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        movieId:
+          type: string
+          format: uuid
+        auditoriumId:
+          type: string
+          format: uuid
+        pricingPlanId:
+          type: string
+          format: uuid
+        refundPolicyId:
+          type: string
+          format: uuid
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        status:
+          $ref: '#/components/schemas/ScreeningStatus'
+        prices:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScreeningPriceResponse'
+        inventorySize:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          format: int64
+    PageResponseTheaterSummary:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TheaterSummary'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    TheaterSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        cityId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        address:
+          type: string
+    CursorPageResponseScreeningSummary:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScreeningSummary'
+        nextCursor:
+          type: string
+    ScreeningSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        movieId:
+          type: string
+          format: uuid
+        auditoriumId:
+          type: string
+          format: uuid
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+    PriceSummary:
+      type: object
+      properties:
+        category:
+          $ref: '#/components/schemas/SeatCategory'
+        amount:
+          type: number
+        currency:
+          type: string
+    ScreeningDetails:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        movieId:
+          type: string
+          format: uuid
+        auditoriumId:
+          type: string
+          format: uuid
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        prices:
+          type: array
+          items:
+            $ref: '#/components/schemas/PriceSummary'
+        inventorySize:
+          type: integer
+          format: int32
+    SeatAvailability:
+      type: object
+      properties:
+        screeningSeatId:
+          type: string
+          format: uuid
+        seatId:
+          type: string
+          format: uuid
+        rowLabel:
+          type: string
+        seatNumber:
+          type: integer
+          format: int32
+        category:
+          $ref: '#/components/schemas/SeatCategory'
+        state:
+          $ref: '#/components/schemas/ScreeningSeatState'
+    MovieSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        durationMinutes:
+          type: integer
+          format: int32
+        language:
+          type: string
+    PageResponseMovieSummary:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MovieSummary'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    CitySummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        country:
+          type: string
+        timeZone:
+          type: string
+    PageResponseCitySummary:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CitySummary'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    CursorPageResponseBookingResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookingResponse'
+        nextCursor:
+          type: string
+    PageResponseTheaterResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TheaterResponse'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PageResponseAuditoriumResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditoriumResponse'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PageResponseScreeningResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScreeningResponse'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PageResponseRefundPolicyResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RefundPolicyResponse'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PageResponsePricingPlanResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PricingPlanResponse'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PageResponseMovieResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MovieResponse'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PageResponseDiscountCodeResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiscountCodeResponse'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PageResponseCityResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CityResponse'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PageResponseSeatResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SeatResponse'
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    FieldViolation:
+      type: object
+      properties:
+        field:
+          type: string
+          example: screeningSeatIds[1]
+        code:
+          type: string
+          example: NotNull
+        message:
+          type: string
+          example: The field is required.
+      required:
+      - code
+      - field
+      - message
+    ProblemDetails:
+      type: object
+      properties:
+        type:
+          type: string
+          format: uri
+          example: /problems/seat-unavailable
+        title:
+          type: string
+          example: Seat unavailable
+        status:
+          type: integer
+          format: int32
+          example: 409
+        detail:
+          type: string
+          example: One or more requested seats are no longer available.
+        instance:
+          type: string
+          format: uri
+          example: /api/v1/seat-reservations
+        code:
+          type: string
+          example: SEAT_UNAVAILABLE
+        requestId:
+          type: string
+          format: uuid
+          example: 8f3d8cbe-0e42-4d9b-9d50-96199b173ba7
+        fieldErrors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldViolation'
+      required:
+      - code
+      - detail
+      - instance
+      - requestId
+      - status
+      - title
+      - type
+    SeatCategory:
+      type: string
+      enum:
+      - REGULAR
+      - PREMIUM
+    DiscountType:
+      type: string
+      enum:
+      - FIXED
+      - PERCENTAGE
+    ReservationState:
+      type: string
+      enum:
+      - ACTIVE
+      - RELEASED
+      - EXPIRED
+      - PAYMENT_IN_PROGRESS
+      - CONVERTED
+    BookingState:
+      type: string
+      enum:
+      - PENDING_PAYMENT
+      - CONFIRMED
+      - FAILED
+      - CANCELLED
+    PaymentStatus:
+      type: string
+      enum:
+      - INITIATED
+      - SUCCEEDED
+      - DECLINED
+    RefundReason:
+      type: string
+      enum:
+      - CANCELLATION
+      - LATE_PAYMENT
+      - SHOW_CANCELLED
+    RefundStatus:
+      type: string
+      enum:
+      - PENDING
+      - PROCESSING
+      - SUCCEEDED
+      - FAILED
+    ScreeningStatus:
+      type: string
+      enum:
+      - ACTIVE
+      - CANCELLED
+    ScreeningSeatState:
+      type: string
+      enum:
+      - AVAILABLE
+      - RESERVED
+      - PAYMENT_IN_PROGRESS
+      - BOOKED
+  responses:
+    BadRequest:
+      description: The request is malformed or fails validation.
+      headers:
+        X-Request-Id:
+          description: Server-generated request correlation identifier
+          schema:
+            type: string
+            format: uuid
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            title: Invalid request
+            requestId: 8f3d8cbe-0e42-4d9b-9d50-96199b173ba7
+            type: /problems/invalid-request
+            status: 400
+            instance: /api/v1/seat-reservations
+            code: INVALID_REQUEST
+            detail: The request could not be processed.
+    Unauthenticated:
+      description: Valid HTTP Basic credentials are required.
+      headers:
+        X-Request-Id:
+          description: Server-generated request correlation identifier
+          schema:
+            type: string
+            format: uuid
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            title: Authentication required
+            requestId: 8f3d8cbe-0e42-4d9b-9d50-96199b173ba7
+            type: /problems/authentication-required
+            status: 401
+            instance: /api/v1/seat-reservations
+            code: AUTHENTICATION_REQUIRED
+            detail: The request could not be processed.
+    Forbidden:
+      description: The authenticated account lacks the required role.
+      headers:
+        X-Request-Id:
+          description: Server-generated request correlation identifier
+          schema:
+            type: string
+            format: uuid
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            title: Access denied
+            requestId: 8f3d8cbe-0e42-4d9b-9d50-96199b173ba7
+            type: /problems/access-denied
+            status: 403
+            instance: /api/v1/seat-reservations
+            code: ACCESS_DENIED
+            detail: The request could not be processed.
+    NotFound:
+      description: The resource does not exist or is concealed from this account.
+      headers:
+        X-Request-Id:
+          description: Server-generated request correlation identifier
+          schema:
+            type: string
+            format: uuid
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            title: Resource not found
+            requestId: 8f3d8cbe-0e42-4d9b-9d50-96199b173ba7
+            type: /problems/resource-not-found
+            status: 404
+            instance: /api/v1/seat-reservations
+            code: RESOURCE_NOT_FOUND
+            detail: The request could not be processed.
+    Conflict:
+      description: The request conflicts with the current resource state.
+      headers:
+        X-Request-Id:
+          description: Server-generated request correlation identifier
+          schema:
+            type: string
+            format: uuid
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            title: Request conflict
+            requestId: 8f3d8cbe-0e42-4d9b-9d50-96199b173ba7
+            type: /problems/request-conflict
+            status: 409
+            instance: /api/v1/seat-reservations
+            code: REQUEST_CONFLICT
+            detail: The request could not be processed.
+    BusinessViolation:
+      description: A business rule prevents the operation.
+      headers:
+        X-Request-Id:
+          description: Server-generated request correlation identifier
+          schema:
+            type: string
+            format: uuid
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            title: Business rule violation
+            requestId: 8f3d8cbe-0e42-4d9b-9d50-96199b173ba7
+            type: /problems/business-rule-violation
+            status: 422
+            instance: /api/v1/seat-reservations
+            code: BUSINESS_RULE_VIOLATION
+            detail: The request could not be processed.
+    InternalError:
+      description: An unexpected failure occurred.
+      headers:
+        X-Request-Id:
+          description: Server-generated request correlation identifier
+          schema:
+            type: string
+            format: uuid
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            title: Internal server error
+            requestId: 8f3d8cbe-0e42-4d9b-9d50-96199b173ba7
+            type: /problems/internal-error
+            status: 500
+            instance: /api/v1/seat-reservations
+            code: INTERNAL_ERROR
+            detail: The request could not be processed.
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      description: Unique key used to safely retry a state-changing request
+      required: true
+      schema:
+        type: string
+        maxLength: 120
+        minLength: 1
+      example: demo-reservation-001
+    Page:
+      name: page
+      in: query
+      description: Zero-based page index
+      schema:
+        type: integer
+        format: int32
+        default: 0
+    PageSize:
+      name: size
+      in: query
+      description: Number of records from 1 to 100
+      schema:
+        type: integer
+        format: int32
+        default: 20
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque cursor returned by the previous response
+      schema:
+        type: string
+      example: eyJ2IjoxLCJrIjo...
+    CursorLimit:
+      name: limit
+      in: query
+      description: Number of records from 1 to 100
+      schema:
+        type: integer
+        format: int32
+        default: 20
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic

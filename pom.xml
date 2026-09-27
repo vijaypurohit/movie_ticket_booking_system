@@ -19,7 +19,8 @@
 
     <properties>
         <java.version>21</java.version>
-        <springdoc.version>3.1.1</springdoc.version>
+        <swagger-ui.version>5.32.14</swagger-ui.version>
+        <openapi-generator.version>7.11.0</openapi-generator.version>
     </properties>
 
     <dependencies>
@@ -52,10 +53,17 @@
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
+        <!-- Swagger UI assets only. The contract itself is the checked-in
+             specification; nothing generates OpenAPI from the running code. -->
         <dependency>
-            <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-            <version>${springdoc.version}</version>
+            <groupId>org.webjars</groupId>
+            <artifactId>swagger-ui</artifactId>
+            <version>${swagger-ui.version}</version>
+        </dependency>
+        <!-- Resolves /webjars/swagger-ui/** without pinning the version in the page. -->
+        <dependency>
+            <groupId>org.webjars</groupId>
+            <artifactId>webjars-locator-lite</artifactId>
         </dependency>
 
         <dependency>
@@ -85,6 +93,68 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.openapitools</groupId>
+                <artifactId>openapi-generator-maven-plugin</artifactId>
+                <version>${openapi-generator.version}</version>
+                <executions>
+                    <execution>
+                        <id>generate-http-contract</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <inputSpec>${project.basedir}/src/main/resources/openapi/openapi.yaml</inputSpec>
+                            <generatorName>spring</generatorName>
+                            <library>spring-boot</library>
+                            <apiPackage>com.vijaypurohit.movietickets.generated.api</apiPackage>
+                            <modelPackage>com.vijaypurohit.movietickets.generated.model</modelPackage>
+                            <generateApiTests>false</generateApiTests>
+                            <generateModelTests>false</generateModelTests>
+                            <generateApiDocumentation>false</generateApiDocumentation>
+                            <generateModelDocumentation>false</generateModelDocumentation>
+                            <generateSupportingFiles>false</generateSupportingFiles>
+                            <typeMappings>
+                                <typeMapping>OffsetDateTime=java.time.Instant</typeMapping>
+                            </typeMappings>
+                            <!-- Reuse the domain enums instead of generating parallel copies. -->
+                            <schemaMappings>
+                                <schemaMapping>SeatCategory=com.vijaypurohit.movietickets.catalog.model.SeatCategory</schemaMapping>
+                                <schemaMapping>BookingState=com.vijaypurohit.movietickets.booking.model.BookingState</schemaMapping>
+                                <schemaMapping>PaymentStatus=com.vijaypurohit.movietickets.payment.model.PaymentStatus</schemaMapping>
+                                <schemaMapping>RefundReason=com.vijaypurohit.movietickets.payment.model.RefundReason</schemaMapping>
+                                <schemaMapping>RefundStatus=com.vijaypurohit.movietickets.payment.model.RefundStatus</schemaMapping>
+                                <schemaMapping>ReservationState=com.vijaypurohit.movietickets.reservation.model.ReservationState</schemaMapping>
+                                <schemaMapping>ScreeningStatus=com.vijaypurohit.movietickets.screening.model.ScreeningStatus</schemaMapping>
+                                <schemaMapping>ScreeningSeatState=com.vijaypurohit.movietickets.screening.model.ScreeningSeatState</schemaMapping>
+                                <schemaMapping>DiscountType=com.vijaypurohit.movietickets.pricing.model.DiscountType</schemaMapping>
+                            </schemaMappings>
+                            <importMappings>
+                                <importMapping>java.time.OffsetDateTime=java.time.Instant</importMapping>
+                                <importMapping>SeatCategory=com.vijaypurohit.movietickets.catalog.model.SeatCategory</importMapping>
+                                <importMapping>BookingState=com.vijaypurohit.movietickets.booking.model.BookingState</importMapping>
+                                <importMapping>PaymentStatus=com.vijaypurohit.movietickets.payment.model.PaymentStatus</importMapping>
+                                <importMapping>RefundReason=com.vijaypurohit.movietickets.payment.model.RefundReason</importMapping>
+                                <importMapping>RefundStatus=com.vijaypurohit.movietickets.payment.model.RefundStatus</importMapping>
+                                <importMapping>ReservationState=com.vijaypurohit.movietickets.reservation.model.ReservationState</importMapping>
+                                <importMapping>ScreeningStatus=com.vijaypurohit.movietickets.screening.model.ScreeningStatus</importMapping>
+                                <importMapping>ScreeningSeatState=com.vijaypurohit.movietickets.screening.model.ScreeningSeatState</importMapping>
+                                <importMapping>DiscountType=com.vijaypurohit.movietickets.pricing.model.DiscountType</importMapping>
+                            </importMappings>
+                            <configOptions>
+                                <interfaceOnly>true</interfaceOnly>
+                                <useSpringBoot3>true</useSpringBoot3>
+                                <useTags>true</useTags>
+                                <useBeanValidation>true</useBeanValidation>
+                                <openApiNullable>false</openApiNullable>
+                                <skipDefaultInterface>true</skipDefaultInterface>
+                                <documentationProvider>none</documentationProvider>
+                                <annotationLibrary>none</annotationLibrary>
+                            </configOptions>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

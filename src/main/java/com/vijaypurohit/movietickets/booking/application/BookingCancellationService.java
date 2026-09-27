@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.vijaypurohit.movietickets.booking.model.BookingRefundRule;
 import com.vijaypurohit.movietickets.booking.model.BookingState;
 import com.vijaypurohit.movietickets.booking.persistence.BookingRepository;
-import com.vijaypurohit.movietickets.booking.web.CancellationResponses.CancellationResponse;
+import com.vijaypurohit.movietickets.generated.model.CancellationResponse;
 import com.vijaypurohit.movietickets.identity.application.CurrentUserProvider;
 import com.vijaypurohit.movietickets.notification.model.OutboxEvent;
 import com.vijaypurohit.movietickets.notification.persistence.OutboxEventRepository;
@@ -24,7 +24,7 @@ import com.vijaypurohit.movietickets.payment.model.Refund;
 import com.vijaypurohit.movietickets.payment.model.RefundReason;
 import com.vijaypurohit.movietickets.payment.persistence.PaymentRepository;
 import com.vijaypurohit.movietickets.payment.persistence.RefundRepository;
-import com.vijaypurohit.movietickets.payment.web.RefundResponses.RefundResponse;
+import com.vijaypurohit.movietickets.generated.model.RefundResponse;
 import com.vijaypurohit.movietickets.screening.persistence.ScreeningRepository;
 import com.vijaypurohit.movietickets.screening.persistence.ScreeningSeatRepository;
 import com.vijaypurohit.movietickets.shared.error.ConflictException;
@@ -93,8 +93,15 @@ public class BookingCancellationService {
     }
 
     private CancellationResponse response(UUID bookingId, Refund refund) {
-        return new CancellationResponse(bookingId, BookingState.CANCELLED,
-                new RefundResponse(refund.getId(), bookingId, refund.getReason(), refund.getStatus(),
-                        refund.getAmount(), refund.getCurrency()));
+        return new CancellationResponse()
+                .bookingId(bookingId)
+                .bookingState(BookingState.CANCELLED)
+                .refund(new RefundResponse()
+                .id(refund.getId())
+                .bookingId(bookingId)
+                .reason(refund.getReason())
+                .status(refund.getStatus())
+                .amount(refund.getAmount())
+                .currency(refund.getCurrency()));
     }
 }

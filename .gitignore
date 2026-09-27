@@ -35,7 +35,11 @@ application-local.yaml
 application-local.properties
 
 .temp/**
+/.postman/**
+/postman/**
+
 
 docs/IMPLEMENTATION_PLAN.md
 docs/TESTING.md
 docs/VIDEO_OUTLINE.md
+docs/DEMO_WORKFLOW.md

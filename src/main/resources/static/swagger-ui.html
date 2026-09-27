@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Movie Ticket Booking API</title>
+    <link rel="stylesheet" href="/webjars/swagger-ui/swagger-ui.css">
+</head>
+<body>
+<div id="swagger-ui"></div>
+<script src="/webjars/swagger-ui/swagger-ui-bundle.js" crossorigin></script>
+<script src="/webjars/swagger-ui/swagger-ui-standalone-preset.js" crossorigin></script>
+<script>
+    // The document is the checked-in specification served by OpenApiDocumentController,
+    // not a contract reconstructed from the running code.
+    window.ui = SwaggerUIBundle({
+        url: '/v3/api-docs',
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+        plugins: [SwaggerUIBundle.plugins.DownloadUrl],
+        layout: 'StandaloneLayout',
+        persistAuthorization: true,
+        tryItOutEnabled: true
+    });
+</script>
+</body>
+</html>
