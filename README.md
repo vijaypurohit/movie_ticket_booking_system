@@ -298,16 +298,32 @@ Set `APP_BOOKING_RESERVATION_DURATION=PT35S`, restart, reserve, wait ~10 seconds
 
 ### Refund tiers
 
-Cancel the same booking at different distances from the show to walk the policy:
+**Every seeded screening is more than 24 hours away, so the stock demo data only ever
+produces a 100% refund.** To show the lower tiers, create a screening a few hours out as
+`admin` first — `POST /admin/api/v1/screenings`:
 
-| Cancel when | Refund |
-|---|---|
-| Day-7 screening (≫ 24 h away) | 100% |
-| A screening 2–24 h away | 50% |
-| A screening < 2 h away | 0% |
-| After the show starts | `409 SCREENING_STARTED` |
+```json
+{
+  "movieId": "<from GET /admin/api/v1/movies>",
+  "auditoriumId": "<from GET /admin/api/v1/theaters/{id}/auditoriums>",
+  "pricingPlanId": "<from GET /admin/api/v1/pricing-plans>",
+  "refundPolicyId": "<from GET /admin/api/v1/refund-policies>",
+  "startTime": "<now + 3 hours, ISO-8601 UTC>",
+  "endTime": "<now + 5 hours>"
+}
+```
 
-The demo screenings are all 18:30 daily, so pick the right day rather than moving the clock.
+Book a seat on it, cancel, and compare:
+
+| Screening starts in | Refund | Verified |
+|---|---|---|
+| > 24 h (any seeded screening) | 100% | ₹650 paid → ₹650 back |
+| 3 h (created as above) | 50% | ₹300 paid → ₹150 back |
+| 1 h (`startTime` = now + 1 h) | 0% | ₹300 paid → ₹0, booking still `CANCELLED` |
+| already started | — | `409 SCREENING_STARTED` |
+
+Creating extra screenings in the same auditorium is fine as long as their time ranges do
+not overlap; adjacent ranges are accepted.
 
 ### Discount codes
 
