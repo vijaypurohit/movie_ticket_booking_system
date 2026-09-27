@@ -1,6 +1,7 @@
 package com.vijaypurohit.movietickets.screening.application;
 
 import java.time.Instant;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
@@ -37,10 +38,12 @@ public class ScreeningBrowseService {
     private final ScreeningSeatRepository seats;
     private final CatalogBrowseService catalog;
     private final CursorCodec cursors;
+    private final Clock clock;
 
     public ScreeningBrowseService(ScreeningRepository screenings, ScreeningSeatRepository seats,
-            CatalogBrowseService catalog, CursorCodec cursors) {
+            CatalogBrowseService catalog, CursorCodec cursors, Clock clock) {
         this.screenings = screenings; this.seats = seats; this.catalog = catalog; this.cursors = cursors;
+        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
@@ -75,7 +78,7 @@ public class ScreeningBrowseService {
     @Transactional(readOnly = true)
     public List<SeatAvailability> seats(UUID screeningId) {
         requireActive(screeningId);
-        return seats.findAvailability(screeningId).stream()
+        return seats.findAvailability(screeningId, clock.instant()).stream()
                 .map(value -> new SeatAvailability(value.getId(), value.getSeatId(), value.getRowLabel(),
                         value.getSeatNumber(), SeatCategory.valueOf(value.getCategory()),
                         ScreeningSeatState.valueOf(value.getState())))
@@ -84,7 +87,7 @@ public class ScreeningBrowseService {
 
     private Screening requireActive(UUID id) {
         return screenings.findDetailedById(id).filter(value -> value.getStatus() == ScreeningStatus.ACTIVE)
-                .orElseThrow(() -> new ResourceNotFoundException("/problems/not-found", "Screening not found", "RESOURCE_NOT_FOUND", "The requested screening was not found."));
+                .orElseThrow(() -> new ResourceNotFoundException("not-found", "Screening not found", "RESOURCE_NOT_FOUND", "The requested screening was not found."));
     }
     private ScreeningSummary summary(Screening value) { return new ScreeningSummary(value.getId(), value.getMovieId(), value.getAuditoriumId(), value.getStartTime(), value.getEndTime()); }
 }

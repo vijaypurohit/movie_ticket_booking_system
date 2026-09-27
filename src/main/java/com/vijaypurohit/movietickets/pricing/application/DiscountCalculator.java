@@ -23,10 +23,10 @@ public class DiscountCalculator {
         Objects.requireNonNull(subtotal);
         Instant now = clock.instant();
         if (!code.isActive() || now.isBefore(code.getValidFrom()) || !now.isBefore(code.getValidUntil())) {
-            throw new BusinessRuleViolationException("/problems/discount-not-valid", "Discount not valid", "DISCOUNT_NOT_VALID", "The discount code is not currently valid.");
+            throw new BusinessRuleViolationException("discount-not-valid", "Discount not valid", "DISCOUNT_NOT_VALID", "The discount code is not currently valid.");
         }
         if (subtotal.compareTo(code.getMinimumSpend()) < 0) {
-            throw new BusinessRuleViolationException("/problems/minimum-spend", "Minimum spend not met", "MINIMUM_SPEND_NOT_MET", "The order does not meet the discount minimum spend.");
+            throw new BusinessRuleViolationException("minimum-spend", "Minimum spend not met", "MINIMUM_SPEND_NOT_MET", "The order does not meet the discount minimum spend.");
         }
         BigDecimal discount = code.getType() == DiscountType.FIXED
                 ? code.getValue()

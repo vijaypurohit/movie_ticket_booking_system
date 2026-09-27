@@ -102,7 +102,7 @@ public class CatalogAdminService {
     private Movie requireMovie(UUID id) { return movies.findById(id).orElseThrow(() -> missing("movie")); }
     private ResourceNotFoundException missing(String resource) { return new ResourceNotFoundException(resource + "-not-found", "Resource not found", "RESOURCE_NOT_FOUND", "The requested " + resource + " was not found."); }
     private BadRequestException invalid(String detail) { return new BadRequestException("invalid-catalog-request", "Invalid catalog request", "INVALID_CATALOG_REQUEST", detail); }
-    private void requireMutableLayout(UUID auditoriumId) { if (futureScreenings.hasFutureScreening(auditoriumId, clock.instant())) throw new BusinessRuleViolationException("/problems/seat-layout-in-use", "Seat layout in use", "SEAT_LAYOUT_IN_USE", "Create a new auditorium layout because a future screening already uses this one."); }
+    private void requireMutableLayout(UUID auditoriumId) { if (futureScreenings.hasFutureScreening(auditoriumId, clock.instant())) throw new BusinessRuleViolationException("seat-layout-in-use", "Seat layout in use", "SEAT_LAYOUT_IN_USE", "Create a new auditorium layout because a future screening already uses this one."); }
     private void validateZone(String zone) { try { ZoneId.of(zone); } catch (DateTimeException exception) { throw invalid("The time zone is invalid."); } }
     private CityResponse city(City v) { return new CityResponse(v.getId(), v.getName(), v.getCountry(), v.getTimeZone(), v.isActive(), v.getCreatedAt(), v.getUpdatedAt(), v.getVersion()); }
     private TheaterResponse theater(Theater v) { return new TheaterResponse(v.getId(), v.getCity().getId(), v.getName(), v.getAddress(), v.isActive(), v.getCreatedAt(), v.getUpdatedAt(), v.getVersion()); }

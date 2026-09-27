@@ -83,14 +83,14 @@ public class PricingAdminService {
         return request.rules().stream().map(rule -> new RuleDefinition(ids.nextId(), rule.cutoffMinutes(), rule.refundPercentage())).toList();
     }
     private void validateDiscount(DiscountCodeRequest request) {
-        if (!request.validUntil().isAfter(request.validFrom())) throw new BadRequestException("/problems/invalid-validity", "Invalid validity window", "INVALID_VALIDITY_WINDOW", "validUntil must be after validFrom.");
-        if (request.type().name().equals("PERCENTAGE") && request.value().compareTo(new java.math.BigDecimal("100")) > 0) throw new BadRequestException("/problems/invalid-discount", "Invalid discount", "INVALID_DISCOUNT", "Percentage discount cannot exceed 100.");
+        if (!request.validUntil().isAfter(request.validFrom())) throw new BadRequestException("invalid-validity", "Invalid validity window", "INVALID_VALIDITY_WINDOW", "validUntil must be after validFrom.");
+        if (request.type().name().equals("PERCENTAGE") && request.value().compareTo(new java.math.BigDecimal("100")) > 0) throw new BadRequestException("invalid-discount", "Invalid discount", "INVALID_DISCOUNT", "Percentage discount cannot exceed 100.");
     }
     private PageRequest page(Integer page, Integer size, String property) { return PageRequest.of(PageLimits.resolvePage(page), PageLimits.resolve(size), Sort.by(property).ascending().and(Sort.by("id"))); }
     private PricingPlan requirePricingPlan(UUID id) { return pricingPlans.findById(id).orElseThrow(() -> missing("Pricing plan")); }
     private DiscountCode requireDiscount(UUID id) { return discountCodes.findById(id).orElseThrow(() -> missing("Discount code")); }
     private RefundPolicy requirePolicy(UUID id) { return refundPolicies.findById(id).orElseThrow(() -> missing("Refund policy")); }
-    private ResourceNotFoundException missing(String resource) { return new ResourceNotFoundException("/problems/not-found", resource + " not found", "RESOURCE_NOT_FOUND", "The requested resource was not found."); }
+    private ResourceNotFoundException missing(String resource) { return new ResourceNotFoundException("not-found", resource + " not found", "RESOURCE_NOT_FOUND", "The requested resource was not found."); }
 
     private PricingPlanResponse response(PricingPlan value) { return new PricingPlanResponse(value.getId(), value.getName(), value.getRegularPrice(), value.getPremiumPrice(), value.getWeekendAdjustment(), INR, value.isActive(), value.getCreatedAt(), value.getUpdatedAt(), value.getVersion()); }
     private DiscountCodeResponse response(DiscountCode value) { return new DiscountCodeResponse(value.getId(), value.getCode(), value.getType(), value.getValue(), value.getValidFrom(), value.getValidUntil(), value.getMinimumSpend(), value.getMaximumDiscount(), value.getGlobalUsageLimit(), value.getPerCustomerUsageLimit(), INR, value.isActive(), value.getCreatedAt(), value.getUpdatedAt(), value.getVersion()); }

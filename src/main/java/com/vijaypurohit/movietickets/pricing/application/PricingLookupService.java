@@ -33,8 +33,8 @@ public class PricingLookupService {
         if (!policy.isActive()) throw inactive("refund policy");
     }
 
-    private ResourceNotFoundException missing(String resource) { return new ResourceNotFoundException("/problems/not-found", resource + " not found", "RESOURCE_NOT_FOUND", "The requested resource was not found."); }
-    private BusinessRuleViolationException inactive(String resource) { return new BusinessRuleViolationException("/problems/inactive-configuration", "Inactive configuration", "INACTIVE_CONFIGURATION", "The selected " + resource + " is inactive."); }
+    private ResourceNotFoundException missing(String resource) { return new ResourceNotFoundException("not-found", resource + " not found", "RESOURCE_NOT_FOUND", "The requested resource was not found."); }
+    private BusinessRuleViolationException inactive(String resource) { return new BusinessRuleViolationException("inactive-configuration", "Inactive configuration", "INACTIVE_CONFIGURATION", "The selected " + resource + " is inactive."); }
 
     public record PricingSnapshot(UUID id, BigDecimal regularPrice, BigDecimal premiumPrice, BigDecimal weekendAdjustment) { }
 }

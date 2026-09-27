@@ -44,10 +44,10 @@ public class CatalogLookupService {
     }
 
     private ResourceNotFoundException missing(String resource) {
-        return new ResourceNotFoundException("/problems/not-found", resource + " not found", "RESOURCE_NOT_FOUND", "The requested resource was not found.");
+        return new ResourceNotFoundException("not-found", resource + " not found", "RESOURCE_NOT_FOUND", "The requested resource was not found.");
     }
     private BusinessRuleViolationException inactive(String resource) {
-        return new BusinessRuleViolationException("/problems/inactive-catalog", "Inactive catalog resource", "INACTIVE_CATALOG_RESOURCE", "The selected " + resource + " is inactive.");
+        return new BusinessRuleViolationException("inactive-catalog", "Inactive catalog resource", "INACTIVE_CATALOG_RESOURCE", "The selected " + resource + " is inactive.");
     }
 
     public record AuditoriumSnapshot(UUID id, ZoneId timeZone, List<SeatSnapshot> seats) { }

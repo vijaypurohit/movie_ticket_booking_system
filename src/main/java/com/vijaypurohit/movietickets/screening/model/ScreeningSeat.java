@@ -17,6 +17,7 @@ public class ScreeningSeat {
     @Id private UUID id;
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "screening_id") private Screening screening;
     @Column(name = "seat_id", nullable = false) private UUID seatId;
+    @Column(name = "reservation_id") private UUID reservationId;
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 30) private ScreeningSeatState state;
 
     protected ScreeningSeat() { }
@@ -25,5 +26,9 @@ public class ScreeningSeat {
         this.seatId = Objects.requireNonNull(seatId); state = ScreeningSeatState.AVAILABLE;
     }
     public UUID getId() { return id; } public UUID getSeatId() { return seatId; }
+    public UUID getScreeningId() { return screening.getId(); }
+    public UUID getReservationId() { return reservationId; }
     public ScreeningSeatState getState() { return state; }
+    public void reserve(UUID reservationId) { if (state != ScreeningSeatState.AVAILABLE) throw new IllegalStateException("seat is unavailable"); this.reservationId = Objects.requireNonNull(reservationId); state = ScreeningSeatState.RESERVED; }
+    public void release(UUID expectedReservationId) { if (Objects.equals(reservationId, expectedReservationId) && (state == ScreeningSeatState.RESERVED || state == ScreeningSeatState.PAYMENT_IN_PROGRESS)) { reservationId = null; state = ScreeningSeatState.AVAILABLE; } }
 }

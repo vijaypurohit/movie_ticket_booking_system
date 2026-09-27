@@ -25,6 +25,9 @@ server:
   shutdown: graceful
 
 app:
+  booking:
+    cleanup-delay: PT30S
+    reservation-duration: PT4M
   pagination:
     cursor-signing-key: ${CURSOR_SIGNING_KEY}
 

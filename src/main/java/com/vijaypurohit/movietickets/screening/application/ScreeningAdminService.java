@@ -50,7 +50,7 @@ public class ScreeningAdminService {
         var plan = pricing.requireActivePricingPlan(request.pricingPlanId());
         pricing.requireActiveRefundPolicy(request.refundPolicyId());
         if (screenings.existsOverlap(request.auditoriumId(), request.startTime(), request.endTime(), ScreeningStatus.ACTIVE)) {
-            throw new ConflictException("/problems/screening-overlap", "Screening overlap", "SCREENING_OVERLAP", "The auditorium already has a screening in this time range.");
+            throw new ConflictException("screening-overlap", "Screening overlap", "SCREENING_OVERLAP", "The auditorium already has a screening in this time range.");
         }
         Screening screening = new Screening(ids.nextId(), request.movieId(), request.auditoriumId(),
                 request.pricingPlanId(), request.refundPolicyId(), request.startTime(), request.endTime());
@@ -78,8 +78,8 @@ public class ScreeningAdminService {
             CatalogLookupService.AuditoriumSnapshot auditorium) {
         return calculator.calculate(base, adjustment, request.startTime(), auditorium.timeZone());
     }
-    private Screening require(UUID id) { return screenings.findDetailedById(id).orElseThrow(() -> new ResourceNotFoundException("/problems/not-found", "Screening not found", "RESOURCE_NOT_FOUND", "The requested resource was not found.")); }
-    private BusinessRuleViolationException violation(String code, String detail) { return new BusinessRuleViolationException("/problems/screening-rule", "Screening rule violation", code, detail); }
+    private Screening require(UUID id) { return screenings.findDetailedById(id).orElseThrow(() -> new ResourceNotFoundException("not-found", "Screening not found", "RESOURCE_NOT_FOUND", "The requested resource was not found.")); }
+    private BusinessRuleViolationException violation(String code, String detail) { return new BusinessRuleViolationException("screening-rule", "Screening rule violation", code, detail); }
     private ScreeningResponse response(Screening screening) {
         List<ScreeningPriceResponse> prices = screening.getPrices().stream()
                 .sorted(Comparator.comparing(price -> price.getSeatCategory().name()))

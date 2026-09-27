@@ -69,7 +69,7 @@ public class CatalogBrowseService {
     }
 
     private City requireActiveCity(UUID id) { return cities.findById(id).filter(City::isActive).orElseThrow(this::missing); }
-    private ResourceNotFoundException missing() { return new ResourceNotFoundException("/problems/not-found", "Resource not found", "RESOURCE_NOT_FOUND", "The requested resource was not found."); }
+    private ResourceNotFoundException missing() { return new ResourceNotFoundException("not-found", "Resource not found", "RESOURCE_NOT_FOUND", "The requested resource was not found."); }
     private CitySummary city(City value) { return new CitySummary(value.getId(), value.getName(), value.getCountry(), value.getTimeZone()); }
     private MovieSummary movie(Movie value) { return new MovieSummary(value.getId(), value.getTitle(), value.getDurationMinutes(), value.getLanguage()); }
 

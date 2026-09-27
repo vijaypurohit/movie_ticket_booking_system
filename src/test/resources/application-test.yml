@@ -9,6 +9,8 @@ app:
     enabled: false
   pricing:
     enabled: false
+  reservation:
+    enabled: false
   screening:
     enabled: false
   identity:
