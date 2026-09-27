@@ -145,15 +145,26 @@ running under that profile.
 
 `CURSOR_SIGNING_KEY` must be at least 32 UTF-8 bytes — the application refuses to start otherwise, because pagination cursors are HMAC-signed to stop clients forging them. `.env` is gitignored; never commit it.
 
-### Step 3 — run
+### Step 3 — point the shell at JDK 21
+
+Export it once. Every `./mvnw` command in this README assumes it is set:
 
 ```bash
-JAVA_HOME=/path/to/jdk-21 ./mvnw spring-boot:run -Dspring-boot.run.profiles=demo
+export JAVA_HOME=/path/to/jdk-21
+```
+
+On macOS with Homebrew that is usually
+`export JAVA_HOME=/opt/homebrew/opt/openjdk@21`; `java -version` must report 21.
+
+### Step 4 — run
+
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=demo
 ```
 
 Flyway applies `V1`–`V9` on startup, Hibernate then validates that the mapped entities match the migrated schema, and the demo seeder loads the dataset below.
 
-### Step 4 — confirm it is up
+### Step 5 — confirm it is up
 
 ```bash
 curl -s localhost:8080/api/v1/cities | head -c 200
@@ -230,20 +241,73 @@ anything. The small dataset is what the rest of this section describes.
 
 Pass either as `"discountCode"` in the booking body. `DemoDatasetIT` covers both paths.
 
+### Resetting between runs
+
+Rehearsing the walkthrough dirties the data: seats stay `BOOKED`, history fills up, `DEMO50`
+is spent, and the fixed idempotency keys in §6 are already used. Two ways back.
+
+**Soft reset — no restart, ~40 ms.** Deletes transactional data only and puts every seat back
+on sale. The catalog, screenings, pricing, refund policy, discount codes and accounts survive
+untouched, so the IDs in §6.0 stay valid and the app keeps running:
+
+```bash
+psql -d movie_tickets <<'SQL'
+BEGIN;
+DELETE FROM outbox_event;
+DELETE FROM refund;
+DELETE FROM payment;
+DELETE FROM discount_redemption;
+DELETE FROM booking_refund_rule;
+DELETE FROM booking_item;
+DELETE FROM booking;
+DELETE FROM seat_reservation;
+UPDATE screening_seat SET state = 'AVAILABLE', reservation_id = NULL;
+UPDATE screening SET status = 'ACTIVE' WHERE status <> 'ACTIVE';
+COMMIT;
+SQL
+```
+
+Afterwards every seat reads `AVAILABLE`, booking history is empty, `DEMO50` has its single
+use back, and keys like `demo-res-1` can be replayed. Save it as an alias and run it between
+takes:
+
+```bash
+alias demo-reset='psql -d movie_tickets -f ~/demo-reset.sql'
+```
+
+It deliberately leaves anything an admin created during the run — extra screenings, extra
+discount codes — in place. Use the hard reset if you want those gone.
+
+**Hard reset — restart required, a few seconds.** Truncate everything and let the seeder
+rebuild it on startup:
+
+```bash
+psql -d movie_tickets -c 'TRUNCATE TABLE
+  outbox_event, refund, payment, discount_redemption, booking_refund_rule, booking_item,
+  booking, seat_reservation, screening_seat, screening_price, screening,
+  refund_policy_rule, refund_policy, discount_code, pricing_plan,
+  seat, auditorium, theater, movie, city, app_user RESTART IDENTITY CASCADE'
+```
+
+Then restart the application — the seeders run at startup, so the data only comes back on
+boot. To also re-run the migrations, `DROP DATABASE movie_tickets;` and recreate it instead.
+
+Seeders are idempotent with deterministic IDs, so no reset ever produces duplicates, and the
+four fixed IDs in §6.0 are identical afterwards.
+
 ### Larger dataset
 
 Catalog only — 3 cities, 10 theaters, 30 auditoriums, 4,500 physical seats, 20 movies,
 840 screenings and ~126,000 screening-seat rows:
 
 ```bash
-JAVA_HOME=/path/to/jdk-21 ./mvnw spring-boot:run -Dspring-boot.run.profiles=capacity
+./mvnw spring-boot:run -Dspring-boot.run.profiles=capacity
 ```
 
 Add booking history — 1,000 customers and 10,000 bookings on top:
 
 ```bash
-JAVA_HOME=/path/to/jdk-21 APP_DEMO_HISTORY_ENABLED=true \
-  ./mvnw spring-boot:run -Dspring-boot.run.profiles=capacity
+APP_DEMO_HISTORY_ENABLED=true ./mvnw spring-boot:run -Dspring-boot.run.profiles=capacity
 ```
 
 History logins are `capacity.customer.0000@movietickets.local` … `0997`, password
@@ -266,154 +330,494 @@ functional check, not a throughput benchmark.
 
 ## 6. Guided demo walkthrough
 
-Roughly ten minutes end to end, entirely through Swagger UI or `curl`. Every creation endpoint needs a **fresh** `Idempotency-Key`.
+Ten minutes end to end with `curl`. The same calls are executable from
+**http://localhost:8080/swagger-ui.html** if you prefer clicking — use **Authorize** with the
+credentials from §5.
 
-### 6.1 Browse anonymously
+`jq` is the only extra tool (`brew install jq`). Every creation endpoint needs a **fresh**
+`Idempotency-Key`.
 
-No authentication required:
+### 6.0 Shell setup
 
-1. `GET /api/v1/cities` → copy the city `id`
-2. `GET /api/v1/movies?cityId={cityId}&date=YYYY-MM-DD` (use tomorrow's date) → copy the movie `id`
-3. `GET /api/v1/screenings?cityId={cityId}&movieId={movieId}&date=YYYY-MM-DD` → copy a screening `id`
-4. `GET /api/v1/screenings/{screeningId}/seats` → note the four seats, all `AVAILABLE`, and copy two `screeningSeatId` values
+The seeder uses deterministic UUIDs, so these four IDs are identical on every machine and
+every run — paste this block once:
+
+```bash
+API=localhost:8080
+CITY=4b33ef60-74fa-367e-8b1d-12fc21925a98        # Demo Pune
+THEATER=ae81b337-117c-35c2-ba5e-8ec7d6551d16     # Demo Cinema
+AUDITORIUM=2b7c76c1-fc3f-3925-9180-2f153c7765b5  # Screen 1
+MOVIE=52a31bb5-df24-39e7-bd9c-8cc933ab5f40       # The Last Commit
+
+CUST1='-u customer1@movietickets.local:Customer@123'
+CUST2='-u customer2@movietickets.local:Customer@123'
+ADMIN='-u admin@movietickets.local:Admin@123'
+JSON='Content-Type: application/json'
+
+DAY1=$(date -v+1d +%F 2>/dev/null || date -d '+1 day' +%F)
+DAY2=$(date -v+2d +%F 2>/dev/null || date -d '+2 day' +%F)
+DAY3=$(date -v+3d +%F 2>/dev/null || date -d '+3 day' +%F)
+```
+
+Screening and seat IDs are derived from the date, so each step below fetches them.
+
+### 6.1 Browse anonymously, with filters
+
+```bash
+curl -s "$API/api/v1/cities?page=0&size=20" | jq -c '.items'
+curl -s "$API/api/v1/theaters?cityId=$CITY&page=0&size=20" | jq -c '.items'
+curl -s "$API/api/v1/movies?cityId=$CITY&date=$DAY1" | jq -c '.items'
+curl -s "$API/api/v1/screenings?cityId=$CITY&movieId=$MOVIE&theaterId=$THEATER&date=$DAY1&limit=20" | jq
+```
+
+`cityId` and `date` are required on `/screenings` and `/movies`; `movieId` and `theaterId`
+are optional narrowing filters. A filter that matches nothing returns an empty page, not a
+`404`:
+
+```bash
+curl -s "$API/api/v1/screenings?cityId=$CITY&theaterId=00000000-0000-4000-8000-000000000999&date=$DAY1" | jq -c
+# {"items":[],"nextCursor":null}
+```
+
+Capture the screening and look at its seats:
+
+```bash
+SCREENING=$(curl -s "$API/api/v1/screenings?cityId=$CITY&date=$DAY1" | jq -r '.items[0].id')
+curl -s "$API/api/v1/screenings/$SCREENING" | jq -c '{inventorySize,prices}'
+curl -s "$API/api/v1/screenings/$SCREENING/seats" \
+  | jq -c '.[]|{seat:"\(.rowLabel)\(.seatNumber)",category,state,screeningSeatId}'
+```
+
+```json
+{"inventorySize":4,"prices":[{"category":"PREMIUM","amount":400.00,"currency":"INR"},
+                             {"category":"REGULAR","amount":250.00,"currency":"INR"}]}
+{"seat":"A1","category":"REGULAR","state":"AVAILABLE","screeningSeatId":"b0d3c2c8-…"}
+{"seat":"A2","category":"REGULAR","state":"AVAILABLE","screeningSeatId":"cbfa67d1-…"}
+{"seat":"B1","category":"PREMIUM","state":"AVAILABLE","screeningSeatId":"99344215-…"}
+{"seat":"B2","category":"PREMIUM","state":"AVAILABLE","screeningSeatId":"67e110f0-…"}
+```
 
 ### 6.2 Hold two seats
 
-Authorize as `customer1`. `POST /api/v1/seat-reservations`, key `demo-res-1`:
+Pick two seats:
 
-```json
-{ "screeningSeatIds": ["<seat-A1-id>", "<seat-B1-id>"] }
+```bash
+A1=$(curl -s "$API/api/v1/screenings/$SCREENING/seats" | jq -r '.[]|select(.rowLabel=="A" and .seatNumber==1)|.screeningSeatId')
+B1=$(curl -s "$API/api/v1/screenings/$SCREENING/seats" | jq -r '.[]|select(.rowLabel=="B" and .seatNumber==1)|.screeningSeatId')
 ```
 
-Returns a reservation with `expiresAt` four minutes out. Re-run `GET /screenings/{id}/seats` in another tab — those two seats now read `RESERVED`, the other two are still `AVAILABLE`.
+Hold them:
+
+```bash
+curl -s $CUST1 -H "$JSON" -H 'Idempotency-Key: demo-res-1' \
+  -d "{\"screeningSeatIds\":[\"$A1\",\"$B1\"]}" \
+  "$API/api/v1/seat-reservations" | tee /tmp/res.json | jq
+```
+
+```json
+{"id":"3093e4b4-…","screeningId":"0e8a7c76-…",
+ "screeningSeatIds":["99344215-…","b0d3c2c8-…"],
+ "state":"ACTIVE","expiresAt":"2026-09-27T14:43:35Z","createdAt":"2026-09-27T14:39:35Z"}
+```
+
+Keep the id for the next step:
+
+```bash
+RESERVATION=$(jq -r .id /tmp/res.json)
+```
+
+Check the seat map — exactly those two flipped:
+
+```bash
+curl -s "$API/api/v1/screenings/$SCREENING/seats" | jq -c '[.[]|{seat:"\(.rowLabel)\(.seatNumber)",state}]'
+```
+
+```json
+[{"seat":"A1","state":"RESERVED"},{"seat":"A2","state":"AVAILABLE"},
+ {"seat":"B1","state":"RESERVED"},{"seat":"B2","state":"AVAILABLE"}]
+```
+
+The hold lasts four minutes, and `screeningSeatIds` comes back **sorted** — that sort is what
+makes `[A1,B1]` and `[B1,A1]` take their locks in the same order.
 
 ### 6.3 Pay and confirm
 
-`POST /api/v1/bookings`, key `demo-book-1`:
-
-```json
-{ "reservationId": "<reservation-id>", "paymentToken": "tok_success" }
+```bash
+curl -s $CUST1 -H "$JSON" -H 'Idempotency-Key: demo-book-1' \
+  -d "{\"reservationId\":\"$RESERVATION\",\"paymentToken\":\"tok_success\"}" \
+  "$API/api/v1/bookings" | tee /tmp/book.json \
+  | jq -c '{state,paymentStatus,subtotal,totalAmount,items:[.items[]|{rowLabel,seatNumber,unitPrice}]}'
 ```
 
-Check the response: `state: CONFIRMED`, `paymentStatus: SUCCEEDED`, and `items[]` carrying the seat labels and per-seat prices captured at checkout. A weekday screening gives ₹250 + ₹400 = **₹650**; a weekend one ₹300 + ₹450 = **₹750**.
+```bash
+BOOKING=$(jq -r .id /tmp/book.json)
+```
 
-Then `GET /api/v1/bookings?limit=20` — the booking appears in `customer1`'s history.
+```json
+{"state":"CONFIRMED","paymentStatus":"SUCCEEDED","subtotal":650.00,"totalAmount":650.00,
+ "items":[{"rowLabel":"A","seatNumber":1,"unitPrice":250.00},
+          {"rowLabel":"B","seatNumber":1,"unitPrice":400.00}]}
+```
 
-### 6.4 Cancel and refund
+₹250 + ₹400 = ₹650 on a weekday; ₹300 + ₹450 = ₹750 on a weekend show. `items[].unitPrice`
+is a snapshot — later admin price edits cannot rewrite this booking.
 
-`POST /api/v1/bookings/{bookingId}/cancellations`, key `demo-cancel-1`. Because the show is more than 24 hours away, the policy returns **100%**. The response carries the refund `id`.
+### 6.4 Booking history, with cursor pagination
 
-Refunds are processed asynchronously. Wait ~5 seconds for the worker, then `GET /api/v1/refunds/{refundId}` → `SUCCEEDED`.
+Make a second, cheaper booking so there are two pages to walk:
 
-Re-run `GET /screenings/{id}/seats` — both seats are `AVAILABLE` again and immediately re-bookable.
+```bash
+A2=$(curl -s "$API/api/v1/screenings/$SCREENING/seats" | jq -r '.[]|select(.rowLabel=="A" and .seatNumber==2)|.screeningSeatId')
+RES2=$(curl -s $CUST1 -H "$JSON" -H 'Idempotency-Key: demo-res-2' \
+  -d "{\"screeningSeatIds\":[\"$A2\"]}" "$API/api/v1/seat-reservations" | jq -r .id)
+```
 
-### 6.5 Show that it is idempotent
+```bash
+curl -s $CUST1 -H "$JSON" -H 'Idempotency-Key: demo-book-2' \
+  -d "{\"reservationId\":\"$RES2\",\"paymentToken\":\"tok_success\"}" \
+  "$API/api/v1/bookings" | jq -c '{state,totalAmount}'
+```
 
-Repeat the cancellation with the **same** key `demo-cancel-1`: the same refund comes back, and no second refund is created.
+```json
+{"state":"CONFIRMED","totalAmount":250.00}
+```
+
+First page — one row and a cursor:
+
+```bash
+curl -s $CUST1 "$API/api/v1/bookings?limit=1" | jq -c '{count:(.items|length),total:.items[0].totalAmount,nextCursor}'
+```
+
+```json
+{"count":1,"total":250.00,"nextCursor":"djF8Qk9PS0lOR3wyMDI2…"}
+```
+
+Follow the cursor to the second page:
+
+```bash
+CURSOR=$(curl -s $CUST1 "$API/api/v1/bookings?limit=1" | jq -r .nextCursor)
+curl -s $CUST1 "$API/api/v1/bookings?limit=1&cursor=$CURSOR" | jq -c '{count:(.items|length),total:.items[0].totalAmount,nextCursor}'
+```
+
+```json
+{"count":1,"total":650.00,"nextCursor":null}
+```
+
+History is time-ordered and mutable, so it pages by signed opaque cursor rather than
+`page`/`size`: rows cannot shift onto a page you have already seen.
+
+### 6.5 Cancel, and watch the refund settle
+
+```bash
+curl -s $CUST1 -X POST -H 'Idempotency-Key: demo-cancel-1' \
+  "$API/api/v1/bookings/$BOOKING/cancellations" | tee /tmp/cancel.json \
+  | jq -c '{bookingState,refund:{status:.refund.status,amount:.refund.amount}}'
+```
+
+```json
+{"bookingState":"CANCELLED","refund":{"status":"PENDING","amount":325.00}}
+```
+
+The refund is `PENDING`. Wait for the worker, then read it back:
+
+```bash
+REFUND=$(jq -r .refund.id /tmp/cancel.json)
+sleep 6                       # the refund worker runs every 5 seconds
+curl -s $CUST1 "$API/api/v1/refunds/$REFUND" | jq -c '{status,amount,reason}'
+```
+
+```json
+{"status":"SUCCEEDED","amount":325.00,"reason":"CANCELLATION"}
+```
+
+The seats, meanwhile, came back the moment you cancelled:
+
+```bash
+curl -s "$API/api/v1/screenings/$SCREENING/seats" | jq -c '[.[].state]'
+```
+
+```json
+["AVAILABLE","BOOKED","AVAILABLE","AVAILABLE"]
+```
+
+A1 and B1 are free again; A2 stays `BOOKED` because that is the second booking from 6.4.
+
+Two things happened at once: the seats came back **immediately**, and the refund settled
+**asynchronously** five seconds later. The customer never waits on a payment provider.
+
+The refunded amount depends on how far away the show is — see
+[refund tiers](#refund-tiers-without-creating-anything) in §7.
+
+### 6.6 Show that it is idempotent
+
+```bash
+curl -s $CUST1 -X POST -H 'Idempotency-Key: demo-cancel-1' \
+  "$API/api/v1/bookings/$BOOKING/cancellations" | jq -r .refund.id
+```
+
+The same refund id comes back; no second refund is created.
 
 ---
 
 ## 7. Exercising edge cases by hand
 
-Each recipe uses only the demo dataset. These are the behaviours worth showing a reviewer.
+Each recipe says how to trigger the behaviour and which test proves it. Run any single
+suite with:
+
+```bash
+./mvnw verify -Dit.test=<Class> -DfailIfNoTests=false
+```
+
+### Index
+
+| Edge case | How | Test that proves it |
+|---|---|---|
+| [Two customers, one seat](#concurrency--two-customers-one-seat) | curl, no config change | `ReservationConcurrencyIT` |
+| [Refund tiers](#refund-tiers-without-creating-anything) | curl, no config change | `BookingJourneysIT` |
+| [Discount limit](#discount-codes-both-seeded) | curl, no config change | `DemoDatasetIT`, `WorkflowRaceIT` |
+| [Declined payment](#payment-decline-releases-the-seat) | curl, no config change | `BookingJourneysIT` |
+| [Admin cancels a show](#admin-cancels-a-show) | curl, no config change | `ShowCancellationIT` |
+| [Ownership concealed](#ownership-is-concealed-not-denied) | curl, no config change | `ApiContractIT` |
+| [Validation and error shape](#validation-and-error-shape) | curl, no config change | `ApiContractIT` |
+| [Idempotency](#idempotency) | curl, no config change | `ApiContractIT`, `BookingJourneysIT` |
+| [Hold expiry](#config-dependent-edge-cases) | **needs config** | `BookingJourneysIT` |
+| [Too little time to pay](#config-dependent-edge-cases) | **needs config** | `WorkflowRaceIT` |
+| [Late payment compensation](#races-you-cannot-reproduce-by-hand) | not reproducible by hand | `WorkflowRaceIT` |
+| [Refund provider failures](#races-you-cannot-reproduce-by-hand) | not reproducible by hand | `RefundWorkerIT` |
 
 ### Concurrency — two customers, one seat
 
 The headline guarantee. Both requests, same seat, at once:
 
 ```bash
-SEAT=<a-screening-seat-id>
-curl -s -u customer1@movietickets.local:Customer@123 -H 'Idempotency-Key: race-1' \
-  -H 'Content-Type: application/json' -d "{\"screeningSeatIds\":[\"$SEAT\"]}" \
-  localhost:8080/api/v1/seat-reservations -o /tmp/a.json -w '%{http_code}\n' &
-curl -s -u customer2@movietickets.local:Customer@123 -H 'Idempotency-Key: race-2' \
-  -H 'Content-Type: application/json' -d "{\"screeningSeatIds\":[\"$SEAT\"]}" \
-  localhost:8080/api/v1/seat-reservations -o /tmp/b.json -w '%{http_code}\n' &
-wait
+SCR3=$(curl -s "$API/api/v1/screenings?cityId=$CITY&date=$DAY3" | jq -r '.items[0].id')
+SEAT=$(curl -s "$API/api/v1/screenings/$SCR3/seats" | jq -r '[.[]|select(.state=="AVAILABLE")|.screeningSeatId][0]')
 ```
 
-Exactly one `201`, one `409 SEAT_UNAVAILABLE`. The automated version of this runs 25 customers at once — see `ReservationConcurrencyIT`.
+```bash
+for U in 1 2; do
+  curl -s -u customer$U@movietickets.local:Customer@123 -H "$JSON" \
+    -H "Idempotency-Key: race-$U-$RANDOM" \
+    -d "{\"screeningSeatIds\":[\"$SEAT\"]}" \
+    "$API/api/v1/seat-reservations" -o /tmp/race$U.json -w "customer$U → HTTP %{http_code}\n" &
+done; wait
+jq -rc '.state // "\(.status) \(.code)"' /tmp/race1.json /tmp/race2.json
+```
 
-### Hold expiry without any worker
+```
+customer2 → HTTP 201
+customer1 → HTTP 409
+409 SEAT_UNAVAILABLE
+ACTIVE
+```
 
-Reserve a seat, then wait four minutes and ask for it as `customer2`. It is granted, because expiry is evaluated logically rather than by the cleanup worker. Then try to pay with `customer1`'s stale reservation → `409 RESERVATION_NOT_ACTIVE`.
+Exactly one `201`, one `409 SEAT_UNAVAILABLE` — and **the winner changes between runs**,
+which is what makes it a real race rather than request ordering.
 
-To avoid waiting, set `APP_BOOKING_RESERVATION_DURATION=PT20S` and restart.
+```bash
+./mvnw verify -Dit.test=ReservationConcurrencyIT -DfailIfNoTests=false
+```
+
+- `exactlyOneOfTwentyFiveCustomersCanReserveTheSameSeat` — 25 threads, one winner.
+- `reversedRequestsFinishWithoutDeadlockWhileDisjointSeatsProceed` — reversed lock order.
+
+### Refund tiers, without creating anything
+
+The seeded policy is **≥ 24 h → 100%, ≥ 2 h → 50%, otherwise 0%**. Because every seeded
+screening starts at 18:30 IST, *tomorrow's* show is **less than 24 hours away once it is past
+18:30 today* — so the stock dataset gives you two tiers with no setup at all. Check before
+demoing:
+
+```bash
+for i in 1 2 3; do
+  D=$(date -v+${i}d +%F 2>/dev/null || date -d "+$i day" +%F)
+  S=$(curl -s "$API/api/v1/screenings?cityId=$CITY&date=$D" | jq -r '.items[0].startTime')
+  python3 -c "
+import datetime
+st=datetime.datetime.fromisoformat('$S'.replace('Z','+00:00'))
+m=(st-datetime.datetime.now(datetime.timezone.utc)).total_seconds()/60
+print(f'day+$i  $D  starts in {m:6.0f} min  ->  ' + ('100%' if m>=1440 else '50%' if m>=120 else '0%'))"
+done
+```
+
+```
+day+1  2026-09-28  starts in   1339 min  ->  50%
+day+2  2026-09-29  starts in   2779 min  ->  100%
+day+3  2026-09-30  starts in   4219 min  ->  100%
+```
+
+| Book on | Paid | Refunded | Tier |
+|---|---|---|---|
+| day+2 or later | ₹225 | ₹225 | **100%** — always |
+| day+1, after 18:30 local | ₹650 | ₹325 | **50%** |
+| a screening < 2 h out | ₹300 | ₹0 | **0%** — booking still `CANCELLED` |
+| a screening already started | — | — | `409 SCREENING_STARTED` |
+
+Only the last two rows need an admin-created screening, because the seeder never places one
+that close. Create one with `startTime` = now + 1 h:
+
+```bash
+PP=$(curl -s $ADMIN "$API/admin/api/v1/pricing-plans" | jq -r '.items[0].id')
+RP=$(curl -s $ADMIN "$API/admin/api/v1/refund-policies" | jq -r '.items[0].id')
+ST=$(python3 -c "import datetime;print((datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M:%SZ'))")
+ET=$(python3 -c "import datetime;print((datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(hours=3)).strftime('%Y-%m-%dT%H:%M:%SZ'))")
+
+curl -s $ADMIN -H "$JSON" -d "{\"movieId\":\"$MOVIE\",\"auditoriumId\":\"$AUDITORIUM\",
+  \"pricingPlanId\":\"$PP\",\"refundPolicyId\":\"$RP\",
+  \"startTime\":\"$ST\",\"endTime\":\"$ET\"}" \
+  "$API/admin/api/v1/screenings" | jq -c '{id,startTime,status}'
+```
+
+Book a seat on it and cancel: the booking becomes `CANCELLED` with a `0.00` refund. Extra
+screenings in the same auditorium are fine as long as time ranges do not overlap.
+
+```bash
+./mvnw verify -Dit.test=BookingJourneysIT -DfailIfNoTests=false
+```
+
+- `adminSetupBrowseDiscountedBookingHistoryCancellationRefundAndSeatReuse` — the full
+  journey with a fixed clock, so every cutoff boundary is exact.
+
+### Discount codes, both seeded
+
+`DEMO10` (10%, reusable) and `DEMO50` (flat ₹50, **one use per database**) are created by the
+seeder. Pass either as `discountCode`:
+
+```bash
+SCR2=$(curl -s "$API/api/v1/screenings?cityId=$CITY&date=$DAY2" | jq -r '.items[0].id')
+SEAT2=$(curl -s "$API/api/v1/screenings/$SCR2/seats" | jq -r '[.[]|select(.state=="AVAILABLE")|.screeningSeatId][0]')
+RESD=$(curl -s $CUST1 -H "$JSON" -H "Idempotency-Key: d10-r-$RANDOM" \
+  -d "{\"screeningSeatIds\":[\"$SEAT2\"]}" "$API/api/v1/seat-reservations" | jq -r .id)
+```
+
+```bash
+curl -s $CUST1 -H "$JSON" -H "Idempotency-Key: d10-b-$RANDOM" \
+  -d "{\"reservationId\":\"$RESD\",\"discountCode\":\"DEMO10\",\"paymentToken\":\"tok_success\"}" \
+  "$API/api/v1/bookings" | jq -c '{state,subtotal,discountAmount,totalAmount}'
+```
+
+```json
+{"state":"CONFIRMED","subtotal":250.00,"discountAmount":25.00,"totalAmount":225.00}
+```
+
+Redeem `DEMO50` twice and the second attempt is rejected:
+
+```json
+{"status":422,"code":"DISCOUNT_LIMIT_REACHED","detail":"The discount code usage limit has been reached."}
+```
+
+The limit is held under a row lock on the code *inside* the checkout transaction, so two
+simultaneous checkouts cannot both take the last use.
+
+```bash
+./mvnw verify -Dit.test=DemoDatasetIT,WorkflowRaceIT -DfailIfNoTests=false
+```
+
+- `theSeededPercentageDiscountAppliesAtCheckout`, `theSeededSingleUseDiscountIsRejectedOnASecondRedemption`
+- `concurrentBookingsCannotExceedTheLastDiscountRedemption` — the concurrent version.
 
 ### Payment decline releases the seat
 
-Reserve, then book with `"paymentToken": "tok_decline"`. The booking comes back `FAILED` / `DECLINED`, and the seat is `AVAILABLE` again immediately. No confirmation notification is sent.
-
-### Too little time left to pay
-
-Set `APP_BOOKING_RESERVATION_DURATION=PT35S`, restart, reserve, wait ~10 seconds, then book → `409 INSUFFICIENT_CHECKOUT_TIME`. Checkout is refused unless 30 seconds remain, so a payment cannot start against a hold that is about to lapse.
-
-### Refund tiers
-
-**Every seeded screening is more than 24 hours away, so the stock demo data only ever
-produces a 100% refund.** To show the lower tiers, create a screening a few hours out as
-`admin` first — `POST /admin/api/v1/screenings`:
-
-```json
-{
-  "movieId": "<from GET /admin/api/v1/movies>",
-  "auditoriumId": "<from GET /admin/api/v1/theaters/{id}/auditoriums>",
-  "pricingPlanId": "<from GET /admin/api/v1/pricing-plans>",
-  "refundPolicyId": "<from GET /admin/api/v1/refund-policies>",
-  "startTime": "<now + 3 hours, ISO-8601 UTC>",
-  "endTime": "<now + 5 hours>"
-}
+```bash
+SEATD=$(curl -s "$API/api/v1/screenings/$SCR3/seats" | jq -r '[.[]|select(.state=="AVAILABLE")|.screeningSeatId][0]')
+RESX=$(curl -s $CUST1 -H "$JSON" -H "Idempotency-Key: dec-r-$RANDOM" \
+  -d "{\"screeningSeatIds\":[\"$SEATD\"]}" "$API/api/v1/seat-reservations" | jq -r .id)
 ```
 
-Book a seat on it, cancel, and compare:
-
-| Screening starts in | Refund | Verified |
-|---|---|---|
-| > 24 h (any seeded screening) | 100% | ₹650 paid → ₹650 back |
-| 3 h (created as above) | 50% | ₹300 paid → ₹150 back |
-| 1 h (`startTime` = now + 1 h) | 0% | ₹300 paid → ₹0, booking still `CANCELLED` |
-| already started | — | `409 SCREENING_STARTED` |
-
-Creating extra screenings in the same auditorium is fine as long as their time ranges do
-not overlap; adjacent ranges are accepted.
-
-### Discount codes
-
-Not seeded — create one as `admin` first. `POST /admin/api/v1/discount-codes`:
-
-```json
-{
-  "code": "DEMO10",
-  "type": "PERCENTAGE",
-  "value": "10.00",
-  "validFrom": "2026-01-01T00:00:00Z",
-  "validUntil": "2027-01-01T00:00:00Z",
-  "minimumSpend": "100.00",
-  "maximumDiscount": "100.00",
-  "globalUsageLimit": 1,
-  "perCustomerUsageLimit": 1
-}
+```bash
+curl -s $CUST1 -H "$JSON" -H "Idempotency-Key: dec-b-$RANDOM" \
+  -d "{\"reservationId\":\"$RESX\",\"paymentToken\":\"tok_decline\"}" \
+  "$API/api/v1/bookings" | jq -c '{state,paymentStatus}'
 ```
 
-Then pass `"discountCode": "DEMO10"` in the booking body. With `globalUsageLimit: 1`, a second customer's booking is rejected `422 DISCOUNT_LIMIT_REACHED` — the limit is enforced under a row lock on the code, so it holds even under concurrent checkout.
+```json
+{"state":"FAILED","paymentStatus":"DECLINED"}
+```
+
+```bash
+curl -s "$API/api/v1/screenings/$SCR3/seats" | jq -r --arg s "$SEATD" '.[]|select(.screeningSeatId==$s)|"seat → \(.state)"'
+```
+
+```
+seat → AVAILABLE
+```
+
+`FAILED` is a queryable record, not an error, and the seat is instantly re-bookable. No
+confirmation notification is written.
+
+Test: `BookingJourneysIT#declinedPaymentReleasesSeatAndWritesNoConfirmationEvent`.
 
 ### Admin cancels a show
 
-Confirm a booking, then as `admin` call `DELETE /admin/api/v1/screenings/{screeningId}`. Every confirmed booking is cancelled, its seats released, and a **full** refund issued — the customer's cutoff tier is deliberately bypassed because the cancellation is not their fault. Check `GET /api/v1/bookings/{id}` as the customer: `CANCELLED`, with a `SHOW_CANCELLED` refund.
+```bash
+DAY5=$(date -v+5d +%F 2>/dev/null || date -d '+5 day' +%F)
+SCR5=$(curl -s "$API/api/v1/screenings?cityId=$CITY&date=$DAY5" | jq -r '.items[0].id')
+SEAT5=$(curl -s "$API/api/v1/screenings/$SCR5/seats" | jq -r '.[0].screeningSeatId')
+RES5=$(curl -s $CUST1 -H "$JSON" -H "Idempotency-Key: sc-r-$RANDOM" \
+  -d "{\"screeningSeatIds\":[\"$SEAT5\"]}" "$API/api/v1/seat-reservations" | jq -r .id)
+BOOK5=$(curl -s $CUST1 -H "$JSON" -H "Idempotency-Key: sc-b-$RANDOM" \
+  -d "{\"reservationId\":\"$RES5\",\"paymentToken\":\"tok_success\"}" \
+  "$API/api/v1/bookings" | jq -r .id)
+```
+
+```bash
+curl -s $ADMIN -X DELETE -o /dev/null -w 'DELETE → %{http_code}\n' "$API/admin/api/v1/screenings/$SCR5"
+```
+
+```bash
+sleep 6
+curl -s $CUST1 "$API/api/v1/bookings/$BOOK5" | jq -c '{state,refunds:[.refunds[]|{reason,status,amount}]}'
+```
+
+```
+DELETE → 204
+{"state":"CANCELLED","refunds":[{"reason":"SHOW_CANCELLED","status":"SUCCEEDED","amount":250.00}]}
+```
+
+The show also comes off sale — it disappears from browse and new holds are refused:
+
+```bash
+curl -s "$API/api/v1/screenings?cityId=$CITY&date=$DAY5" | jq -c '.items|length'   # 0
+```
+
+Every confirmed booking is cancelled, its seats released, and a **full** refund issued — the
+cutoff tier is deliberately bypassed because the cancellation is not the customer's fault.
+
+```bash
+./mvnw verify -Dit.test=ShowCancellationIT -DfailIfNoTests=false
+```
+
+Covers the full refund, idempotent repeat, sweeper recovery after an interrupted run, and
+`409` on an already-started show.
 
 ### Ownership is concealed, not denied
 
-As `customer2`, fetch `customer1`'s booking → `404`, not `403`. Leaking "this exists but is not yours" is itself a disclosure.
+```bash
+curl -s -o /dev/null -w 'customer2 reads customer1 booking → %{http_code}\n' $CUST2 "$API/api/v1/bookings/$BOOKING"
+# 404
+```
+
+`403` would confirm the booking exists. Test:
+`ApiContractIT#ownershipIsConcealedAndConflictsUseTheExpectedStatus`.
 
 ### Validation and error shape
 
 ```bash
-curl -s -u customer1@movietickets.local:Customer@123 -H 'Idempotency-Key: bad-1' \
-  -H 'Content-Type: application/json' -d '{"screeningSeatIds":[]}' \
-  localhost:8080/api/v1/seat-reservations | jq
+curl -s $CUST1 -H "$JSON" -H "Idempotency-Key: bad-$RANDOM" \
+  -d '{"screeningSeatIds":[]}' "$API/api/v1/seat-reservations" | jq
 ```
 
-Returns `application/problem+json` with `type`, `title`, `status`, `detail`, `instance`, `code`, `requestId` and `fieldErrors[]`. Every response also carries a server-generated `X-Request-Id`.
+```json
+{"detail":"Request validation failed.","instance":"/api/v1/seat-reservations","status":400,
+ "title":"Invalid request","type":"/problems/invalid-request","code":"INVALID_REQUEST",
+ "requestId":"a8e277e3-…",
+ "fieldErrors":[{"field":"screeningSeatIds","code":"Size","message":"size must be between 1 and 10"}]}
+```
+
+Every response also carries a server-generated `X-Request-Id`. Tests:
+`ApiContractIT#validationAndMalformedContractsReturnSafeProblemDetails` and
+`#rawSqlAndJdbcErrorLoggingRemainDisabled`, which asserts no SQL or JDBC detail reaches the
+logs.
 
 ### Idempotency
 
@@ -422,6 +826,72 @@ Returns `application/problem+json` with `type`, `title`, `status`, `detail`, `in
 | Same key, same body | Original result returned; nothing new created |
 | Same key, different body | `409 IDEMPOTENCY_KEY_REUSED` |
 | New key, same body | A genuinely new operation |
+
+```bash
+BODY="{\"screeningSeatIds\":[\"$SEATD\"]}"
+```
+
+Same key, same body — twice. Both print the **same** id, and nothing new is created:
+
+```bash
+curl -s $CUST1 -H "$JSON" -H 'Idempotency-Key: demo-idem' -d "$BODY" "$API/api/v1/seat-reservations" | jq -r .id
+curl -s $CUST1 -H "$JSON" -H 'Idempotency-Key: demo-idem' -d "$BODY" "$API/api/v1/seat-reservations" | jq -r .id
+```
+
+Same key, *different* body — rejected:
+
+```bash
+curl -s $CUST1 -H "$JSON" -H 'Idempotency-Key: demo-idem' \
+  -d '{"screeningSeatIds":["00000000-0000-4000-8000-000000000001"]}' \
+  "$API/api/v1/seat-reservations" | jq -c '{status,code}'
+```
+
+```json
+{"status":409,"code":"IDEMPOTENCY_KEY_REUSED"}
+```
+
+### Config-dependent edge cases
+
+These depend on time passing. Rather than waiting, either restart the app with a shortened
+duration, or run the test that already covers it against a controlled clock.
+
+| Behaviour | Run the app with | Then | Test instead |
+|---|---|---|---|
+| Hold expires and the seat is reclaimed | `APP_BOOKING_RESERVATION_DURATION=PT20S` | reserve, wait 20 s, reserve the same seat as `customer2` → `201`; pay with the stale reservation → `409 RESERVATION_NOT_ACTIVE` | `BookingJourneysIT#reservationExpiresAtTheExactBoundaryAndIsReclaimedWithoutCleanup` |
+| Too little time left to pay | `APP_BOOKING_RESERVATION_DURATION=PT35S` | reserve, wait ~10 s, book → `409 INSUFFICIENT_CHECKOUT_TIME` | `WorkflowRaceIT#lateGatewaySuccessCannotConfirmOrReclaimASeatResoldAfterTheLeaseExpired` |
+| Cleanup worker sweeping expired holds | `APP_BOOKING_CLEANUP_DELAY=PT5S` | reserve, wait, watch the seat free itself | `WorkflowRaceIT#cleanupRacingAReclaimLeavesOneConsistentSeatOwner` |
+| Refund retries and terminal failure | `APP_REFUND_MAX_ATTEMPTS=1` | cancel a booking and watch the refund give up after one attempt | `RefundWorkerIT` (all four) |
+
+Example — the hold-expiry run:
+
+```bash
+APP_BOOKING_RESERVATION_DURATION=PT20S ./mvnw spring-boot:run -Dspring-boot.run.profiles=demo
+```
+
+Expiry is **logical**: a hold past its deadline is treated as free the moment anybody asks,
+so this works with the cleanup worker disabled entirely. The worker is housekeeping, not
+correctness — which is exactly what the `…WithoutCleanup` test name asserts.
+
+### Races you cannot reproduce by hand
+
+Two behaviours need the payment gateway parked mid-flight, which no sequence of `curl`
+commands can arrange. They are covered by tests that script the gateway through
+`ScriptedPaymentGateway`:
+
+```bash
+./mvnw verify -Dit.test=WorkflowRaceIT,RefundWorkerIT -DfailIfNoTests=false
+```
+
+| Test | What it pins down |
+|---|---|
+| `lateGatewaySuccessCannotConfirmOrReclaimASeatResoldAfterTheLeaseExpired` | A charge that succeeds *after* the lease lapsed and the seat was resold: the payment is recorded, the booking stays failed, one compensating refund is queued, and the new owner keeps the seat |
+| `cleanupRacingAReclaimLeavesOneConsistentSeatOwner` | The cleanup worker and a live reclaim touching the same seat |
+| `twoWorkersNeverClaimTheSameEventAndAnExpiredLeaseIsReclaimable` | `FOR UPDATE SKIP LOCKED` outbox claiming |
+| `retryableProviderFailureIsRetriedOnALaterBoundedAttemptAndThenSucceeds` | Bounded retry with backoff |
+| `terminalProviderFailureStopsAtTheConfiguredAttemptLimit` | No infinite retry on a terminal provider error |
+
+This is the honest reason the test suite exists: the most important guarantees in this system
+are the ones a manual demo cannot show.
 
 ---
 
@@ -471,8 +941,8 @@ interface, so **an implementation that drifts from the specification does not co
 ```bash
 # 1. edit src/main/resources/openapi/openapi.yaml
 # 2. regenerate and let the compiler tell you what no longer matches
-JAVA_HOME=/path/to/jdk-21 ./mvnw generate-sources
-JAVA_HOME=/path/to/jdk-21 ./mvnw compile
+./mvnw generate-sources
+./mvnw compile
 ```
 
 Never edit anything under `target/generated-sources` — it is overwritten on every build.
@@ -499,13 +969,13 @@ Conventions:
 Fast unit tests only (no Docker):
 
 ```bash
-JAVA_HOME=/path/to/jdk-21 ./mvnw clean test
+./mvnw clean test
 ```
 
 Everything, including the PostgreSQL-backed suites:
 
 ```bash
-JAVA_HOME=/path/to/jdk-21 ./mvnw clean verify
+./mvnw clean verify
 ```
 
 `verify` uses a shared **PostgreSQL 17 Testcontainer** by default, so Docker must be running. If you cannot pull images, point the suites at an existing database instead:
@@ -529,12 +999,12 @@ JAVA_HOME=/path/to/jdk-21 ./mvnw clean verify
 | `ReservationConcurrencyIT` | 2 | 25 customers on one seat; reversed lock order; disjoint seats proceed in parallel |
 | `WorkflowRaceIT` | 4 | Payment vs. lease expiry vs. resale; last-discount race; cleanup vs. reclaim; two-worker claim and lease recovery |
 | `RefundWorkerIT` | 4 | Refund success, retryable-then-success, terminal stop, attempt-limit exhaustion |
-| `ShowCancellationIT` | 5 | Admin show cancellation, full refund, idempotency, sweeper recovery, started-show rejection |
+| `ShowCancellationIT` | 6 | Admin show cancellation takes the show off sale, full refund, idempotency, sweeper recovery, started-show rejection |
 | `BookingJourneysIT` | 4 | End-to-end: discounted booking → history → cancellation → refund → seat reuse; expiry; decline; reminders |
 | `DemoDatasetIT` | 3 | The seeded demo dataset: catalog and a week of screenings, the `DEMO10` discount, `DEMO50` single-use rejection, seeder idempotency |
 | `CapacityDatasetIT` | 1 | 126,000 seat rows, cursor paging through 10,000 bookings, bounded worker batches |
 
-**Latest run: 52 tests — 21 unit/context, 31 integration — 0 failures, 0 errors, 0 skips**, on the default Testcontainer.
+**Latest run: 53 tests — 21 unit/context, 32 integration — 0 failures, 0 errors, 0 skips**, on the default Testcontainer.
 
 ---
 
@@ -568,14 +1038,6 @@ JAVA_HOME=/path/to/jdk-21 ./mvnw clean verify
 - Discount usage limits are enforced by a row lock on the code inside the checkout transaction, verified by a concurrent last-redemption test.
 
 ---
-
-## 12. AI-assisted workflow
-
-The repository keeps the original [requirements](docs/requirements.md), the [design](docs/DESIGN.md), and the [AGENTS.md](AGENTS.md) instructions that governed development. The implementation plan, testing strategy and recording script are kept as local working notes.
-
-AI assistance was used milestone by milestone: inspect the requirement and the existing code, propose a bounded change set, wait for approval, implement, review the diff, run focused and then full verification. The main areas it was applied to were transaction boundaries, deterministic lock ordering, deadlock-retry placement, idempotency, late-payment compensation, worker bounds, cursor pagination, OpenAPI coverage, capacity data and log safety.
-
-No external skill package or app connector was used; this was repository-native Java development with the Maven wrapper, Git and a local PostgreSQL instance. That is the complete tooling disclosure.
 
 ---
 

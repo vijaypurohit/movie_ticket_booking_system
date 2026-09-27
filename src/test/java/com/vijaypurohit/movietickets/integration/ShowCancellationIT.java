@@ -41,6 +41,9 @@ class ShowCancellationIT extends ApiIntegrationTest {
 
         assertThat(bookingState(bookingId)).isEqualTo("CANCELLED");
         assertThat(seatStates(scenario.screeningId())).containsOnly("AVAILABLE");
+        // The seats are released, so the screening itself must stop selling — otherwise the
+        // refunded show goes straight back on sale.
+        assertThat(screeningStatus(scenario.screeningId())).isEqualTo("CANCELLED");
 
         assertThat(count("SELECT count(*) FROM refund WHERE reason = 'SHOW_CANCELLED'")).isEqualTo(1);
         BigDecimal refunded = new BigDecimal(jdbc.queryForObject(
@@ -122,6 +125,23 @@ class ShowCancellationIT extends ApiIntegrationTest {
         assertThat(get("/admin/api/v1/screenings", CUSTOMER_ONE_EMAIL, CUSTOMER_PASSWORD).status()).isEqualTo(403);
     }
 
+    @Test
+    void cancellingAScreeningWithNoBookingsStillTakesItOffSale() {
+        // Regression: cancel() delegates the status change through its own proxy. A plain
+        // self-invocation bypassed the transaction, so the row was never flushed and the
+        // screening stayed ACTIVE and bookable even though the endpoint answered 204.
+        Scenario scenario = createScenario(2, false);
+
+        requireStatus(delete("/admin/api/v1/screenings/" + scenario.screeningId(),
+                ADMIN_EMAIL, ADMIN_PASSWORD), 204);
+
+        assertThat(screeningStatus(scenario.screeningId())).isEqualTo("CANCELLED");
+
+        var browse = requireStatus(get("/api/v1/screenings?cityId=" + scenario.cityId()
+                + "&date=" + scenario.screeningDate()), 200);
+        assertThat(browse.body().get("items")).as("a cancelled screening is no longer browsable").isEmpty();
+    }
+
     private String confirmBooking(Scenario scenario, int seatIndex, String keyPrefix) {
         ApiResponse reservation = requireStatus(post("/api/v1/seat-reservations",
                 Map.of("screeningSeatIds", List.of(scenario.screeningSeatIds().get(seatIndex))),
@@ -140,6 +160,11 @@ class ShowCancellationIT extends ApiIntegrationTest {
 
     private List<String> seatStates(String screeningId) {
         return jdbc.queryForList("SELECT state FROM screening_seat WHERE screening_id = ?::uuid",
+                String.class, screeningId);
+    }
+
+    private String screeningStatus(String screeningId) {
+        return jdbc.queryForObject("SELECT status FROM screening WHERE id = ?::uuid",
                 String.class, screeningId);
     }
 

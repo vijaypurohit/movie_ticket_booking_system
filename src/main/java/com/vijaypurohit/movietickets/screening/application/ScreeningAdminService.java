@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,12 +43,16 @@ public class ScreeningAdminService {
     private final IdGenerator ids;
     private final Clock clock;
     private final ObjectProvider<ScreeningCancellationService> cancellations;
+    /** Self proxy, so the status change really opens its own transaction. */
+    private final ScreeningAdminService self;
 
     public ScreeningAdminService(ScreeningRepository screenings, CatalogLookupService catalog,
             PricingLookupService pricing, PricingCalculator calculator, IdGenerator ids, Clock clock,
-            ObjectProvider<ScreeningCancellationService> cancellations) {
+            ObjectProvider<ScreeningCancellationService> cancellations,
+            @Lazy ScreeningAdminService self) {
         this.screenings = screenings; this.catalog = catalog; this.pricing = pricing;
-        this.calculator = calculator; this.ids = ids; this.clock = clock; this.cancellations = cancellations;
+        this.calculator = calculator; this.ids = ids; this.clock = clock;
+        this.cancellations = cancellations; this.self = self;
     }
 
     @Transactional
@@ -85,8 +90,14 @@ public class ScreeningAdminService {
      * reservation or checkout can succeed, so the bounded per-booking drain that follows cannot
      * race new sales. An interrupted drain is finished by the cancellation sweeper.
      */
+    /**
+     * Stops sales first, then drains the bookings. The two phases are separate transactions on
+     * purpose: the drain runs in bounded batches and may be resumed by the sweeper, so it must
+     * not be held open by the status change. The call goes through {@code self} because a plain
+     * {@code this.markCancelled(id)} would bypass the transactional proxy and never be flushed.
+     */
     public void cancel(UUID id) {
-        markCancelled(id);
+        self.markCancelled(id);
         cancellations.ifAvailable(service -> service.settleBookings(id));
     }
 
