@@ -13,11 +13,13 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.vijaypurohit.movietickets.identity.application.CurrentUserProvider;
+import com.vijaypurohit.movietickets.booking.application.BookingTransactionService;
 import com.vijaypurohit.movietickets.reservation.model.ReservationState;
 import com.vijaypurohit.movietickets.reservation.model.SeatReservation;
 import com.vijaypurohit.movietickets.reservation.persistence.SeatReservationRepository;
@@ -42,12 +44,15 @@ public class SeatReservationService {
     private final IdGenerator ids;
     private final Clock clock;
     private final Duration duration;
+    private final ObjectProvider<BookingTransactionService> bookingTransactions;
 
     public SeatReservationService(SeatReservationRepository reservations, ScreeningSeatRepository seats,
             ScreeningRepository screenings, CurrentUserProvider users, IdGenerator ids, Clock clock,
-            @Value("${app.booking.reservation-duration:PT4M}") Duration duration) {
+            @Value("${app.booking.reservation-duration:PT4M}") Duration duration,
+            ObjectProvider<BookingTransactionService> bookingTransactions) {
         this.reservations = reservations; this.seats = seats; this.screenings = screenings;
         this.users = users; this.ids = ids; this.clock = clock; this.duration = duration;
+        this.bookingTransactions = bookingTransactions;
     }
 
     @Transactional
@@ -62,6 +67,8 @@ public class SeatReservationService {
             return response(existing.get(), seats.findByReservationIdOrderById(existing.get().getId()));
         }
 
+        seats.findReservationIds(requestedIds).forEach(reservationId ->
+                bookingTransactions.ifAvailable(service -> service.expireCheckoutForReservation(reservationId)));
         List<ScreeningSeat> locked = seats.findAllByIdForUpdate(requestedIds);
         if (locked.size() != requestedIds.size()) throw conflict("SEAT_UNAVAILABLE", "One or more seats are unavailable.");
         Instant now = clock.instant();

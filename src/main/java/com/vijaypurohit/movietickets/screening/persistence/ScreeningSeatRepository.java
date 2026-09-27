@@ -43,8 +43,29 @@ public interface ScreeningSeatRepository extends JpaRepository<ScreeningSeat, UU
 
     List<ScreeningSeat> findByReservationIdOrderById(UUID reservationId);
 
+    @Query("select distinct seat.reservationId from ScreeningSeat seat where seat.id in :ids and seat.reservationId is not null")
+    List<UUID> findReservationIds(@Param("ids") List<UUID> ids);
+
+    @Query(value = """
+            SELECT screening_seat.id AS screeningSeatId, seat.row_label AS rowLabel,
+                   seat.seat_number AS seatNumber, seat.category AS category,
+                   screening_price.amount AS unitPrice
+            FROM screening_seat
+            JOIN seat ON seat.id = screening_seat.seat_id
+            JOIN screening_price ON screening_price.screening_id = screening_seat.screening_id
+                 AND screening_price.seat_category = seat.category
+            WHERE screening_seat.reservation_id = :reservationId
+            ORDER BY seat.row_label, seat.seat_number, screening_seat.id
+            """, nativeQuery = true)
+    List<CheckoutSeatProjection> findCheckoutSnapshots(@Param("reservationId") UUID reservationId);
+
     interface SeatAvailabilityProjection {
         UUID getId(); UUID getSeatId(); String getRowLabel(); int getSeatNumber();
         String getCategory(); String getState();
+    }
+
+    interface CheckoutSeatProjection {
+        UUID getScreeningSeatId(); String getRowLabel(); int getSeatNumber();
+        String getCategory(); java.math.BigDecimal getUnitPrice();
     }
 }

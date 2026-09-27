@@ -1,6 +1,8 @@
 package com.vijaypurohit.movietickets.pricing.application;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -8,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import com.vijaypurohit.movietickets.pricing.persistence.PricingPlanRepository;
 import com.vijaypurohit.movietickets.pricing.persistence.RefundPolicyRepository;
+import com.vijaypurohit.movietickets.pricing.persistence.DiscountCodeRepository;
 import com.vijaypurohit.movietickets.shared.error.BusinessRuleViolationException;
 import com.vijaypurohit.movietickets.shared.error.ResourceNotFoundException;
 
@@ -16,10 +19,15 @@ import com.vijaypurohit.movietickets.shared.error.ResourceNotFoundException;
 public class PricingLookupService {
     private final PricingPlanRepository pricingPlans;
     private final RefundPolicyRepository refundPolicies;
+    private final DiscountCodeRepository discountCodes;
+    private final DiscountCalculator discountCalculator;
 
-    public PricingLookupService(PricingPlanRepository pricingPlans, RefundPolicyRepository refundPolicies) {
+    public PricingLookupService(PricingPlanRepository pricingPlans, RefundPolicyRepository refundPolicies,
+            DiscountCodeRepository discountCodes, DiscountCalculator discountCalculator) {
         this.pricingPlans = pricingPlans;
         this.refundPolicies = refundPolicies;
+        this.discountCodes = discountCodes;
+        this.discountCalculator = discountCalculator;
     }
 
     public PricingSnapshot requireActivePricingPlan(UUID id) {
@@ -33,8 +41,33 @@ public class PricingLookupService {
         if (!policy.isActive()) throw inactive("refund policy");
     }
 
+    public DiscountQuote quoteDiscount(String code, BigDecimal subtotal) {
+        var discount = discountCodes.findByCodeForUpdate(code.strip().toUpperCase(Locale.ROOT))
+                .orElseThrow(() -> missing("Discount code"));
+        var result = discountCalculator.calculate(discount, subtotal);
+        return new DiscountQuote(discount.getId(), result.discount(), result.total(),
+                discount.getGlobalUsageLimit(), discount.getPerCustomerUsageLimit());
+    }
+
+    public List<RefundRuleSnapshot> refundRules(UUID policyId) {
+        var policy = refundPolicies.findById(policyId).orElseThrow(() -> missing("Refund policy"));
+        if (!policy.isActive()) throw inactive("refund policy");
+        return policy.getRules().stream()
+                .map(rule -> new RefundRuleSnapshot(rule.getCutoffMinutes(), rule.getRefundPercentage()))
+                .toList();
+    }
+
+    public DiscountLimits lockDiscount(UUID id) {
+        var discount = discountCodes.findByIdForUpdate(id).orElseThrow(() -> missing("Discount code"));
+        return new DiscountLimits(discount.getGlobalUsageLimit(), discount.getPerCustomerUsageLimit());
+    }
+
     private ResourceNotFoundException missing(String resource) { return new ResourceNotFoundException("not-found", resource + " not found", "RESOURCE_NOT_FOUND", "The requested resource was not found."); }
     private BusinessRuleViolationException inactive(String resource) { return new BusinessRuleViolationException("inactive-configuration", "Inactive configuration", "INACTIVE_CONFIGURATION", "The selected " + resource + " is inactive."); }
 
     public record PricingSnapshot(UUID id, BigDecimal regularPrice, BigDecimal premiumPrice, BigDecimal weekendAdjustment) { }
+    public record DiscountQuote(UUID discountCodeId, BigDecimal discount, BigDecimal total,
+            Integer globalLimit, Integer perCustomerLimit) { }
+    public record RefundRuleSnapshot(long cutoffMinutes, BigDecimal percentage) { }
+    public record DiscountLimits(Integer globalLimit, Integer perCustomerLimit) { }
 }

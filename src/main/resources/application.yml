@@ -26,8 +26,17 @@ server:
 
 app:
   booking:
+    checkout-duration: PT1M
     cleanup-delay: PT30S
+    minimum-remaining: PT30S
     reservation-duration: PT4M
+  refund:
+    worker-delay: PT5S
+  notification:
+    worker-delay: PT5S
+    reminder-lead: PT24H
+    reminder-window: PT5M
+    reminder-scan-delay: PT1M
   pagination:
     cursor-signing-key: ${CURSOR_SIGNING_KEY}
 

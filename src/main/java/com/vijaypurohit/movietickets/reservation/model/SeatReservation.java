@@ -32,6 +32,19 @@ public class SeatReservation extends AuditableEntity {
         state = ReservationState.ACTIVE;
     }
     public boolean isExpired(Instant now) { return state == ReservationState.ACTIVE && !expiresAt.isAfter(now); }
+    public boolean isCheckoutExpired(Instant now) { return state == ReservationState.PAYMENT_IN_PROGRESS && !checkoutExpiresAt.isAfter(now); }
+    public void beginCheckout(Instant deadline) {
+        if (state != ReservationState.ACTIVE) throw new IllegalStateException("reservation is not active");
+        checkoutExpiresAt = Objects.requireNonNull(deadline);
+        state = ReservationState.PAYMENT_IN_PROGRESS;
+    }
+    public void convert() {
+        if (state != ReservationState.PAYMENT_IN_PROGRESS) throw new IllegalStateException("reservation is not checking out");
+        state = ReservationState.CONVERTED;
+    }
+    public void failCheckout() {
+        if (state == ReservationState.PAYMENT_IN_PROGRESS) state = ReservationState.RELEASED;
+    }
     public void expire() { if (state == ReservationState.ACTIVE) state = ReservationState.EXPIRED; }
     public void release() { if (state == ReservationState.ACTIVE || state == ReservationState.EXPIRED) state = ReservationState.RELEASED; }
     public UUID getId() { return id; } public UUID getCustomerId() { return customerId; }

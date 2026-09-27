@@ -5,7 +5,9 @@ import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 
@@ -14,6 +16,14 @@ import com.vijaypurohit.movietickets.reservation.model.SeatReservation;
 public interface SeatReservationRepository extends JpaRepository<SeatReservation, UUID> {
     Optional<SeatReservation> findByCustomerIdAndIdempotencyKey(UUID customerId, String idempotencyKey);
     Optional<SeatReservation> findByIdAndCustomerId(UUID id, UUID customerId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select reservation from SeatReservation reservation where reservation.id = :id and reservation.customerId = :customerId")
+    Optional<SeatReservation> findOwnedForUpdate(@Param("id") UUID id, @Param("customerId") UUID customerId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select reservation from SeatReservation reservation where reservation.id = :id")
+    Optional<SeatReservation> findByIdForUpdate(@Param("id") UUID id);
 
     @Query(value = """
             SELECT * FROM seat_reservation

@@ -3,6 +3,10 @@ spring:
     banner-mode: "off"
 
 app:
+  booking:
+    enabled: false
+  notification:
+    enabled: false
   browse:
     enabled: false
   catalog:

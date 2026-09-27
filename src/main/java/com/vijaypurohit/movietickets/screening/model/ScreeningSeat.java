@@ -30,5 +30,8 @@ public class ScreeningSeat {
     public UUID getReservationId() { return reservationId; }
     public ScreeningSeatState getState() { return state; }
     public void reserve(UUID reservationId) { if (state != ScreeningSeatState.AVAILABLE) throw new IllegalStateException("seat is unavailable"); this.reservationId = Objects.requireNonNull(reservationId); state = ScreeningSeatState.RESERVED; }
+    public void beginCheckout(UUID expectedReservationId) { if (state != ScreeningSeatState.RESERVED || !Objects.equals(reservationId, expectedReservationId)) throw new IllegalStateException("seat is not held by reservation"); state = ScreeningSeatState.PAYMENT_IN_PROGRESS; }
+    public void book(UUID expectedReservationId) { if (state != ScreeningSeatState.PAYMENT_IN_PROGRESS || !Objects.equals(reservationId, expectedReservationId)) throw new IllegalStateException("seat is not checking out"); reservationId = null; state = ScreeningSeatState.BOOKED; }
+    public void cancelBooking() { if (state != ScreeningSeatState.BOOKED) throw new IllegalStateException("seat is not booked"); state = ScreeningSeatState.AVAILABLE; }
     public void release(UUID expectedReservationId) { if (Objects.equals(reservationId, expectedReservationId) && (state == ScreeningSeatState.RESERVED || state == ScreeningSeatState.PAYMENT_IN_PROGRESS)) { reservationId = null; state = ScreeningSeatState.AVAILABLE; } }
 }
