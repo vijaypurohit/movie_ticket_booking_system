@@ -35,7 +35,7 @@ class DatabaseContractIT extends ApiIntegrationTest {
                 order by constraint_name
                 """, String.class);
 
-        assertThat(migrations).isEqualTo(8);
+        assertThat(migrations).isEqualTo(9);
         assertThat(constraints).contains("uq_reservation_customer_key", "uq_booking_customer_key",
                 "uq_refund_payment_reason", "outbox_event_business_key_key");
     }

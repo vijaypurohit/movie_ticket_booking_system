@@ -73,6 +73,11 @@ public class Booking extends AuditableEntity {
         cancellationIdempotencyKey = Objects.requireNonNull(idempotencyKey);
         state = BookingState.CANCELLED;
     }
+    /** Admin cancelled the screening, so the booking is settled without a customer idempotency key. */
+    public void cancelForCancelledScreening() {
+        if (state != BookingState.CONFIRMED) throw new IllegalStateException("booking is not confirmed");
+        state = BookingState.CANCELLED;
+    }
 
     public UUID getId() { return id; }
     public String getReference() { return reference; }

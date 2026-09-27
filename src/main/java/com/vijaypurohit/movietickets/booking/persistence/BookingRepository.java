@@ -57,6 +57,9 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @Query("select booking from Booking booking where booking.state = 'PENDING_PAYMENT' and booking.checkoutExpiresAt <= :now order by booking.checkoutExpiresAt, booking.id")
     List<Booking> findExpiredPending(@Param("now") Instant now, Pageable pageable);
 
+    @Query("select booking.id from Booking booking where booking.screeningId = :screeningId and booking.state = 'CONFIRMED' order by booking.id")
+    List<UUID> findConfirmedIdsByScreening(@Param("screeningId") UUID screeningId, Pageable pageable);
+
     @Query(value = """
             SELECT booking.id AS bookingId, screening.start_time AS screeningStart
             FROM booking JOIN screening ON screening.id = booking.screening_id

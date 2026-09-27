@@ -196,7 +196,7 @@ class ApiContractIT extends ApiIntegrationTest {
         operations.put("/admin/api/v1/discount-codes/{id}", Set.of("get", "put", "delete"));
         operations.put("/admin/api/v1/refund-policies", Set.of("get", "post"));
         operations.put("/admin/api/v1/refund-policies/{id}", Set.of("get", "put", "delete"));
-        operations.put("/admin/api/v1/screenings", Set.of("post"));
+        operations.put("/admin/api/v1/screenings", Set.of("post", "get"));
         operations.put("/admin/api/v1/screenings/{id}", Set.of("get", "delete"));
         operations.put("/admin/api/v1/screenings/{id}/prices", Set.of("get"));
         return new TreeMap<>(operations);

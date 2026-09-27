@@ -21,6 +21,26 @@ public interface ScreeningRepository extends JpaRepository<Screening, UUID> {
 
     boolean existsByAuditoriumIdAndStatusAndStartTimeAfter(UUID auditoriumId, ScreeningStatus status, Instant startTime);
 
+    /** Cancelled screenings that still have confirmed bookings waiting to be settled. */
+    @Query("""
+            select distinct screening.id from Screening screening, Booking booking
+            where screening.status = :status
+              and booking.screeningId = screening.id
+              and booking.state = 'CONFIRMED'
+            order by screening.id
+            """)
+    List<UUID> findWithUnsettledBookings(@Param("status") ScreeningStatus status, Pageable pageable);
+
+    /** Administrative listing; both filters are optional. */
+    @EntityGraph(attributePaths = {"prices", "seats"})
+    @Query("""
+            select screening from Screening screening
+            where (:auditoriumId is null or screening.auditoriumId = :auditoriumId)
+              and (:movieId is null or screening.movieId = :movieId)
+            """)
+    org.springframework.data.domain.Page<Screening> findAdminPage(@Param("auditoriumId") UUID auditoriumId,
+            @Param("movieId") UUID movieId, Pageable pageable);
+
     @EntityGraph(attributePaths = {"prices", "seats"})
     @Query("select screening from Screening screening where screening.id = :id")
     Optional<Screening> findDetailedById(@Param("id") UUID id);

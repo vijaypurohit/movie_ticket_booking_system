@@ -10,6 +10,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+
+import com.vijaypurohit.movietickets.booking.application.ScreeningCancellationService;
 import com.vijaypurohit.movietickets.catalog.application.CatalogLookupService;
 import com.vijaypurohit.movietickets.catalog.model.SeatCategory;
 import com.vijaypurohit.movietickets.pricing.application.PricingCalculator;
@@ -24,6 +29,8 @@ import com.vijaypurohit.movietickets.shared.error.BusinessRuleViolationException
 import com.vijaypurohit.movietickets.shared.error.ConflictException;
 import com.vijaypurohit.movietickets.shared.error.ResourceNotFoundException;
 import com.vijaypurohit.movietickets.shared.identifier.IdGenerator;
+import com.vijaypurohit.movietickets.shared.pagination.PageLimits;
+import com.vijaypurohit.movietickets.shared.pagination.PageResponse;
 
 @Service
 @ConditionalOnProperty(prefix = "app.screening", name = "enabled", havingValue = "true", matchIfMissing = true)
@@ -34,11 +41,13 @@ public class ScreeningAdminService {
     private final PricingCalculator calculator;
     private final IdGenerator ids;
     private final Clock clock;
+    private final ObjectProvider<ScreeningCancellationService> cancellations;
 
     public ScreeningAdminService(ScreeningRepository screenings, CatalogLookupService catalog,
-            PricingLookupService pricing, PricingCalculator calculator, IdGenerator ids, Clock clock) {
+            PricingLookupService pricing, PricingCalculator calculator, IdGenerator ids, Clock clock,
+            ObjectProvider<ScreeningCancellationService> cancellations) {
         this.screenings = screenings; this.catalog = catalog; this.pricing = pricing;
-        this.calculator = calculator; this.ids = ids; this.clock = clock;
+        this.calculator = calculator; this.ids = ids; this.clock = clock; this.cancellations = cancellations;
     }
 
     @Transactional
@@ -63,10 +72,29 @@ public class ScreeningAdminService {
     @Transactional(readOnly = true)
     public ScreeningResponse get(UUID id) { return response(require(id)); }
 
-    @Transactional
+    @Transactional(readOnly = true)
+    public PageResponse<ScreeningResponse> list(UUID auditoriumId, UUID movieId, Integer page, Integer size) {
+        PageRequest request = PageRequest.of(PageLimits.resolvePage(page), PageLimits.resolve(size),
+                Sort.by("startTime").ascending().and(Sort.by("id")));
+        return PageResponse.from(screenings.findAdminPage(auditoriumId, movieId, request).map(this::response));
+    }
+
+    /**
+     * Cancels the screening, then settles every booking it already sold. The status change and the
+     * settlement are deliberately separate: once the screening is {@code CANCELLED} no new
+     * reservation or checkout can succeed, so the bounded per-booking drain that follows cannot
+     * race new sales. An interrupted drain is finished by the cancellation sweeper.
+     */
     public void cancel(UUID id) {
+        markCancelled(id);
+        cancellations.ifAvailable(service -> service.settleBookings(id));
+    }
+
+    @Transactional
+    public void markCancelled(UUID id) {
         Screening screening = require(id);
         if (!screening.getStartTime().isAfter(clock.instant())) throw violation("SCREENING_STARTED", "A started screening cannot be cancelled.");
+        if (screening.getStatus() == ScreeningStatus.CANCELLED) return;
         screening.cancel();
     }
 

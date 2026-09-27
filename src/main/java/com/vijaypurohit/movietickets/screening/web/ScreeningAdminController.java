@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -20,6 +21,7 @@ import com.vijaypurohit.movietickets.screening.application.ScreeningAdminService
 import com.vijaypurohit.movietickets.screening.web.ScreeningRequests.CreateScreeningRequest;
 import com.vijaypurohit.movietickets.screening.web.ScreeningResponses.ScreeningPriceResponse;
 import com.vijaypurohit.movietickets.screening.web.ScreeningResponses.ScreeningResponse;
+import com.vijaypurohit.movietickets.shared.pagination.PageResponse;
 import com.vijaypurohit.movietickets.shared.openapi.OpenApiConfiguration;
 
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -40,6 +42,7 @@ public class ScreeningAdminController {
     @PostMapping @ResponseStatus(HttpStatus.CREATED)
     public ScreeningResponse create(@Valid @RequestBody CreateScreeningRequest request) { return service.create(request); }
     @GetMapping("/{id}") public ScreeningResponse get(@PathVariable UUID id) { return service.get(id); }
+    @GetMapping public PageResponse<ScreeningResponse> list(@RequestParam(required = false) UUID auditoriumId, @RequestParam(required = false) UUID movieId, @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) { return service.list(auditoriumId, movieId, page, size); }
     @GetMapping("/{id}/prices") public List<ScreeningPriceResponse> prices(@PathVariable UUID id) { return service.get(id).prices(); }
     @DeleteMapping("/{id}") @ResponseStatus(HttpStatus.NO_CONTENT) public void cancel(@PathVariable UUID id) { service.cancel(id); }
 }
