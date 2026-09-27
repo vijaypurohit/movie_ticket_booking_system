@@ -1,0 +1,6 @@
+app:
+  demo:
+    enabled: true
+    large-enabled: true
+    history-enabled: false
+    anchor-date: 2030-01-07

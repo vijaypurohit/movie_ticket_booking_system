@@ -34,6 +34,18 @@ class DiscountCalculatorTest {
                 .isInstanceOf(BusinessRuleViolationException.class);
     }
 
+    @Test void validityIncludesStartAndExcludesEnd() {
+        DiscountCode atStart = new DiscountCode(UUID.randomUUID(), "START", DiscountType.FIXED,
+                new BigDecimal("10.00"), NOW, NOW.plusSeconds(60), BigDecimal.ZERO, null, null, null);
+        DiscountCode atEnd = new DiscountCode(UUID.randomUUID(), "END", DiscountType.FIXED,
+                new BigDecimal("10.00"), NOW.minusSeconds(60), NOW, BigDecimal.ZERO, null, null, null);
+
+        assertThat(calculator.calculate(atStart, new BigDecimal("100.00")).discount())
+                .isEqualByComparingTo("10.00");
+        assertThatThrownBy(() -> calculator.calculate(atEnd, new BigDecimal("100.00")))
+                .isInstanceOf(BusinessRuleViolationException.class);
+    }
+
     private DiscountCode code(DiscountType type, String value, String cap, String minimum) {
         return new DiscountCode(UUID.randomUUID(), "SAVE", type, new BigDecimal(value), NOW.minusSeconds(60),
                 NOW.plusSeconds(60), new BigDecimal(minimum), cap == null ? null : new BigDecimal(cap), null, null);

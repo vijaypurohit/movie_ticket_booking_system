@@ -40,7 +40,6 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @Query("select booking from Booking booking where booking.id = :id and booking.customerId = :customerId")
     Optional<Booking> findOwnedForUpdate(@Param("id") UUID id, @Param("customerId") UUID customerId);
 
-    @EntityGraph(attributePaths = "items")
     @Query("""
             select booking from Booking booking
             where booking.customerId = :customerId
@@ -50,6 +49,10 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             """)
     List<Booking> findHistory(@Param("customerId") UUID customerId,
             @Param("cursorTime") Instant cursorTime, @Param("cursorId") UUID cursorId, Pageable pageable);
+
+    @EntityGraph(attributePaths = "items")
+    @Query("select distinct booking from Booking booking where booking.id in :ids")
+    List<Booking> findHistoryDetails(@Param("ids") List<UUID> ids);
 
     @Query("select booking from Booking booking where booking.state = 'PENDING_PAYMENT' and booking.checkoutExpiresAt <= :now order by booking.checkoutExpiresAt, booking.id")
     List<Booking> findExpiredPending(@Param("now") Instant now, Pageable pageable);

@@ -9,7 +9,8 @@ import org.springframework.test.context.ActiveProfiles;
         "spring.autoconfigure.exclude="
                 + "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,"
                 + "org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration,"
-                + "org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration"
+                + "org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration,"
+                + "org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration"
 })
 class MovieTicketsApplicationTests {
 

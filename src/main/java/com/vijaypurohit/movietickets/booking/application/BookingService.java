@@ -84,13 +84,15 @@ public class BookingService {
         List<Booking> values = hasMore ? page.subList(0, limit) : page;
         List<UUID> ids = values.stream().map(Booking::getId).toList();
         if (ids.isEmpty()) return new CursorPageResponse<>(List.of(), null);
+        Map<UUID, Booking> detailedById = bookings.findHistoryDetails(ids).stream()
+                .collect(Collectors.toMap(Booking::getId, Function.identity()));
         Map<UUID, Payment> byBooking = payments.findByBookingIdIn(ids).stream()
                 .collect(Collectors.toMap(Payment::getBookingId, Function.identity()));
         Map<UUID, List<Refund>> refundsByBooking = refunds.findByBookingIdIn(ids).stream()
                 .collect(Collectors.groupingBy(Refund::getBookingId));
-        List<BookingResponse> items = values.stream()
-                .map(booking -> response(booking, byBooking.get(booking.getId()),
-                        refundsByBooking.getOrDefault(booking.getId(), List.of())))
+        List<BookingResponse> items = ids.stream()
+                .map(id -> response(detailedById.get(id), byBooking.get(id),
+                        refundsByBooking.getOrDefault(id, List.of())))
                 .toList();
         String nextCursor = null;
         if (hasMore && !values.isEmpty()) {

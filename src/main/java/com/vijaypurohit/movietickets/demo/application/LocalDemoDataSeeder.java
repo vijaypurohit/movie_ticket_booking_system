@@ -36,6 +36,7 @@ import com.vijaypurohit.movietickets.screening.persistence.ScreeningRepository;
 
 @Component
 @ConditionalOnProperty(prefix = "app.demo", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(prefix = "app.demo", name = "large-enabled", havingValue = "false", matchIfMissing = true)
 public class LocalDemoDataSeeder implements ApplicationRunner {
     private static final ZoneId ZONE = ZoneId.of("Asia/Kolkata");
     private final CityRepository cities; private final TheaterRepository theaters;

@@ -17,6 +17,8 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.vijaypurohit.movietickets.identity.application.CurrentUserProvider;
 import com.vijaypurohit.movietickets.booking.application.BookingTransactionService;
@@ -45,18 +47,27 @@ public class SeatReservationService {
     private final Clock clock;
     private final Duration duration;
     private final ObjectProvider<BookingTransactionService> bookingTransactions;
+    private final DeadlockRetryExecutor deadlockRetries;
+    private final TransactionTemplate transactions;
 
     public SeatReservationService(SeatReservationRepository reservations, ScreeningSeatRepository seats,
             ScreeningRepository screenings, CurrentUserProvider users, IdGenerator ids, Clock clock,
             @Value("${app.booking.reservation-duration:PT4M}") Duration duration,
-            ObjectProvider<BookingTransactionService> bookingTransactions) {
+            ObjectProvider<BookingTransactionService> bookingTransactions,
+            DeadlockRetryExecutor deadlockRetries,
+            PlatformTransactionManager transactionManager) {
         this.reservations = reservations; this.seats = seats; this.screenings = screenings;
         this.users = users; this.ids = ids; this.clock = clock; this.duration = duration;
         this.bookingTransactions = bookingTransactions;
+        this.deadlockRetries = deadlockRetries;
+        this.transactions = new TransactionTemplate(transactionManager);
     }
 
-    @Transactional
     public ReservationResponse create(String idempotencyKey, CreateReservationRequest request) {
+        return deadlockRetries.execute(() -> transactions.execute(status -> createInTransaction(idempotencyKey, request)));
+    }
+
+    private ReservationResponse createInTransaction(String idempotencyKey, CreateReservationRequest request) {
         UUID customerId = users.requireCustomerId();
         List<UUID> requestedIds = request.screeningSeatIds().stream().sorted().toList();
         if (new HashSet<>(requestedIds).size() != requestedIds.size()) throw conflict("DUPLICATE_SEAT", "The request contains duplicate seats.");

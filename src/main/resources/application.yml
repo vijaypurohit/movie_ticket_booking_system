@@ -24,6 +24,10 @@ spring:
 server:
   shutdown: graceful
 
+logging:
+  level:
+    org.hibernate.orm.jdbc.error: "OFF"
+
 app:
   booking:
     checkout-duration: PT1M

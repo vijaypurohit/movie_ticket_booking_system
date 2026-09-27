@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,11 +23,13 @@ import com.vijaypurohit.movietickets.screening.web.ScreeningResponses.ScreeningR
 import com.vijaypurohit.movietickets.shared.openapi.OpenApiConfiguration;
 
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 @Validated
 @RestController
-@RequestMapping("/admin/api/v1/screenings")
+@RequestMapping(value = "/admin/api/v1/screenings", produces = MediaType.APPLICATION_JSON_VALUE)
+@Tag(name = "Admin screenings")
 @SecurityRequirement(name = OpenApiConfiguration.BASIC_AUTH_SCHEME)
 @ConditionalOnProperty(prefix = "app.screening", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class ScreeningAdminController {

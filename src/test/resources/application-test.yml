@@ -3,6 +3,8 @@ spring:
     banner-mode: "off"
 
 app:
+  demo:
+    generator-enabled: false
   booking:
     enabled: false
   notification:
