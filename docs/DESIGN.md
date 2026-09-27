@@ -27,6 +27,7 @@ The system is a PostgreSQL-backed modular monolith. Its primary guarantee is:
 - Manage movies and scheduled screenings.
 - Configure regular and premium prices with a weekend adjustment.
 - Configure discount codes and refund policies.
+- Cancel a scheduled screening, which refunds every ticket it already sold in full.
 - Activate or deactivate catalog records.
 
 ### Not implemented
@@ -56,7 +57,7 @@ The system is intended to be developed and demonstrated in 48 hours on one machi
 | API page size | default 20, maximum 100 |
 | Worker batch size | 100 records |
 
-Pagination follows the access pattern instead of forcing one mechanism on every collection. Movie and administrator lists use zero-based offset pagination because those screens benefit from page numbers and totals. Screening browse and customer booking history use opaque keyset cursors because they are time-ordered, mutable collections. Cities, theaters within a city, and a screening's complete seat layout are returned as bounded lists without pagination. Every paginated query uses deterministic ordering with the UUID as its final tie-breaker.
+Pagination follows the access pattern instead of forcing one mechanism on every collection. Movie, city, theater, and administrator lists use zero-based offset pagination because those screens benefit from page numbers and totals. Screening browse and customer booking history use opaque keyset cursors because they are time-ordered, mutable collections. A screening's complete seat layout is the one collection returned as a bounded list without pagination, because a caller always needs the whole auditorium at once. Every paginated query uses deterministic ordering with the UUID as its final tie-breaker.
 
 ## 4. Technology Choices
 
@@ -94,11 +95,13 @@ flowchart LR
 ```text
 identity      users, credentials, ADMIN/CUSTOMER roles
 catalog       cities, theaters, auditoriums, seats, movies
-screening     scheduling, pricing, screening-seat inventory, browsing
+pricing       pricing plans, discount codes, refund policies
+screening     scheduling, screening-seat inventory, browsing
 reservation   temporary seat reservations and expiry
 booking       checkout, confirmation, history, cancellation
 payment       payments, refunds, and local adapter
 notification  outbox, confirmations, reminders, and local adapter
+demo          deterministic local seed and capacity dataset
 shared        errors, time, identifiers, and pagination
 ```
 
@@ -150,6 +153,7 @@ Checkout expiry releases the seats and marks the pending booking failed. Payment
 - Booking items snapshot the final price; bookings, payments, and refunds store `INR` for audit clarity.
 - Discount codes support fixed and percentage reductions with validity, minimum spend, usage limits, and an optional cap.
 - At checkout, the booking stores immutable copies of its refund-policy cutoff and percentage rules. Later admin edits affect only later bookings.
+- A refund rule reads as "cancel at least `cutoffMinutes` before the screening starts and receive `percentage`". Cancellation selects every rule whose cutoff is satisfied by the minutes remaining and applies the most generous one; when no rule matches, the refund is zero. A policy therefore needs an explicit `cutoffMinutes: 0` rule only when the last band should pay out more than nothing.
 
 ### 6.5 Isolate local external providers
 
@@ -179,7 +183,7 @@ Booking, cancellation, and refund transactions write `OutboxEvent` rows. Workers
 | `DiscountCode` | Code, type, value, validity, limits, active flag |
 | `DiscountRedemption` | Discount, customer, booking, awarded amount |
 | `RefundPolicy` | Named policy with ordered cutoff/percentage rules |
-| `Refund` | Booking, payment, INR amount, cancellation or late-payment reason, state, idempotency key; unique per payment and reason |
+| `Refund` | Booking, payment, INR amount, reason (`CANCELLATION`, `LATE_PAYMENT`, or `SHOW_CANCELLED`), state, idempotency key; unique per payment and reason |
 | `OutboxEvent` | Event type, aggregate ID, payload, state, next attempt, attempt count |
 
 ```mermaid
@@ -266,14 +270,17 @@ Reservation, booking, and cancellation creation require `Idempotency-Key`.
 /admin/api/v1/movies
 /admin/api/v1/pricing-plans
 /admin/api/v1/screenings
+/admin/api/v1/screenings/{screeningId}
 /admin/api/v1/screenings/{screeningId}/prices
 /admin/api/v1/discount-codes
 /admin/api/v1/refund-policies
 ```
 
-Administrator collection endpoints use zero-based `page` and `size` parameters and return page metadata. The default size is 20 and the maximum is 100.
+Administrator collection endpoints use zero-based `page` and `size` parameters and return page metadata. The default size is 20 and the maximum is 100. `GET /admin/api/v1/screenings` additionally accepts optional `auditoriumId` and `movieId` filters.
 
 Creating a screening rejects auditorium schedule overlap and materializes screening seats and final weekday/weekend prices in one transaction.
+
+`DELETE /admin/api/v1/screenings/{screeningId}` cancels a scheduled screening and settles the tickets it already sold, as described in section 10.5. A screening that has already started cannot be cancelled.
 
 ### Error response
 
@@ -329,6 +336,8 @@ The availability response is advisory; the locked reservation transaction is aut
 9. On decline, mark payment/booking failed and release only seats still owned by this reservation.
 10. If success arrives after checkout expiry, record the payment success, keep the booking failed, and queue one compensating refund. Never reclaim seats already released or reserved by another customer. Retry/recovery processing resolves a pending payment attempt after a process failure using the gateway's idempotency key.
 
+Checkout and cancellation both take a row lock on the authenticated customer before reading their idempotency keys. That serializes one customer's concurrent checkouts, so two identical in-flight requests cannot each miss the other's booking and create two payments. Different customers never contend on this lock.
+
 Repeating the request with the same key returns the original outcome and never creates another payment or booking.
 
 ### 10.3 Cancel and refund
@@ -345,4 +354,15 @@ Repeated cancellation returns the existing cancellation and refund.
 1. Workers claim outbox rows in batches using `FOR UPDATE SKIP LOCKED`.
 2. The local notification adapter records confirmation, cancellation, refund, and reminder deliveries.
 3. Retryable failures use bounded attempts and `next_attempt_at`.
-4. A scheduled query creates one reminder event per confirmed booking within the configured reminder window; a unique event key prevents duplicates.
+4. A scheduled query creates one reminder event per confirmed booking within the configured reminder window; a unique event key prevents duplicates. The event key includes the configured lead time, so changing that configuration intentionally produces a new reminder for bookings that already received the old one.
+
+### 10.5 Cancel a screening
+
+An administrator may withdraw a scheduled show. The customers hold valid tickets through no fault of their own, so their booking's own cutoff rules are deliberately not applied.
+
+1. Mark the screening `CANCELLED` in its own short transaction. Both the reservation and the checkout paths require an `ACTIVE` screening, so no new seat can be sold from this point and the settlement that follows cannot race a new sale.
+2. Drain the screening's `CONFIRMED` bookings in bounded batches of 100, each booking in its own transaction: lock the booking and payment, release its seats, mark the booking `CANCELLED`, and write a `SCREENING_CANCELLED` outbox event.
+3. Create one full refund of the captured amount with reason `SHOW_CANCELLED`. The unique `(payment_id, reason)` constraint makes this idempotent, so a repeated request or a retry never refunds twice.
+4. A sweeper reruns the same bounded drain for any screening left `CANCELLED` with unsettled bookings, so an interrupted request completes without operator action.
+
+Reservations that were merely held, rather than paid for, need no compensation: they expire against the cancelled screening and their seats are never resold.

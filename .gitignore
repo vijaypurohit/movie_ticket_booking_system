@@ -34,3 +34,8 @@ application-local.yml
 application-local.yaml
 application-local.properties
 
+.temp/**
+
+docs/IMPLEMENTATION_PLAN.md
+docs/TESTING.md
+docs/VIDEO_OUTLINE.md

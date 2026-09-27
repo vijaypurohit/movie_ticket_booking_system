@@ -29,6 +29,9 @@ Confirmation, cancellation, refund, and reminder messages use a transactional ou
 - Reservations expire logically at their deadline, so seats can be reclaimed even when the cleanup worker has not run. Cleanup remains bounded housekeeping rather than a correctness dependency.
 - Checkout is allowed only when at least 30 seconds remain. Starting checkout creates a separate one-minute lease; a late successful charge produces an idempotent compensating refund instead of reclaiming a resold seat.
 - Cancellation applies to the complete booking. Partial cancellation, rescheduling, loyalty points, dynamic demand pricing, and multi-currency settlement are outside scope.
+- An administrator may cancel a scheduled screening. Because the customer is not at fault, every confirmed booking is refunded in full and its seats are released, bypassing the booking's own cutoff rules. The settlement runs in bounded batches and a sweeper resumes it if it is interrupted.
+- A refund rule means "cancel at least `cutoffMinutes` before the screening starts and receive `percentage`". The most generous matching rule wins, and no matching rule means no refund.
+- The reminder event key includes the configured lead time, so changing `app.notification.reminder-lead` deliberately produces a fresh reminder for bookings that already received the old one.
 - Referenced catalog records are deactivated instead of deleted. Normal browse queries exclude inactive records.
 - Offset pagination is used for stable administrative lists; mutable time-ordered screening and booking-history collections use signed opaque cursors.
 - HTTP Basic, demo credentials, and the local payment/refund/notification adapters are development choices, not production integrations.
@@ -82,6 +85,8 @@ Spring Boot accepts these values through `.env`, environment variables, or equiv
 | `APP_NOTIFICATION_WORKER_DELAY` | `PT5S` | Outbox delivery interval |
 | `APP_NOTIFICATION_REMINDER_LEAD` | `PT24H` | Reminder lead time |
 | `APP_NOTIFICATION_REMINDER_WINDOW` | `PT5M` | Reminder eligibility window |
+| `APP_NOTIFICATION_MAX_ATTEMPTS` | `5` | Bounded outbox delivery attempts before terminal failure |
+| `APP_REFUND_MAX_ATTEMPTS` | `3` | Bounded refund provider attempts before terminal failure |
 
 The `demo` profile enables the small dataset. The explicit `capacity` profile enables the larger functional-capacity dataset. Raw Hibernate JDBC error logging is disabled so database constraint details and customer data are not written to application logs.
 
@@ -113,7 +118,7 @@ This deterministically generates 3 cities, 10 theaters, 30 auditoriums, 4,500 ph
 - OpenAPI JSON: `http://localhost:8080/v3/api-docs`
 - Public browse APIs: `/api/v1/cities`, `/api/v1/theaters`, `/api/v1/movies`, and `/api/v1/screenings`
 - Customer APIs: `/api/v1/seat-reservations`, `/api/v1/bookings`, and `/api/v1/refunds`
-- Administration APIs: `/admin/api/v1/**`
+- Administration APIs: `/admin/api/v1/**`, including `GET /admin/api/v1/screenings` (paginated, with optional `auditoriumId` and `movieId` filters) and `DELETE /admin/api/v1/screenings/{id}` to cancel a show and refund its tickets
 
 Reservation, booking, and cancellation creation require an `Idempotency-Key` header. Movie and administration lists use offset pages. Screening browse and booking history use signed opaque cursors. Page sizes are limited to 100; clients request subsequent pages instead of raising that bound.
 
@@ -133,28 +138,28 @@ Run the Maven verification lifecycle:
 JAVA_HOME=/path/to/jdk-21 ./mvnw clean verify
 ```
 
-The required scenarios and concurrency checks are listed in [docs/TESTING.md](docs/TESTING.md). The design and implementation sequence are in [docs/DESIGN.md](docs/DESIGN.md) and [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md).
+The required scenarios and concurrency checks are recorded in the testing strategy kept alongside this repository. The design is in [docs/DESIGN.md](docs/DESIGN.md).
 
 `verify` separates fast unit tests from PostgreSQL-backed repository, API, concurrency, and end-to-end suites. The database suites use a shared PostgreSQL 17 Testcontainer by default. A pre-existing PostgreSQL instance can be used for constrained environments by supplying the `test.database.url`, `test.database.username`, and `test.database.password` Maven system properties.
 
-The latest clean run passed 36 tests: 21 unit/context tests and 15 PostgreSQL schema, API contract, concurrency, capacity, and end-to-end tests. It started from an empty PostgreSQL 15 database with no failures, errors, or skips. The capacity check generated 126,000 screening-seat rows and 10,000 booking-history rows; it is a functional local check, not a production throughput benchmark.
+The latest clean run passed 49 tests: 21 unit/context tests and 28 PostgreSQL schema, API contract, concurrency, race, refund-worker, capacity, and end-to-end tests, with no failures, errors, or skips. It used the default PostgreSQL 17 Testcontainer. The capacity check generated 126,000 screening-seat rows and 10,000 booking-history rows; it is a functional local check, not a production throughput benchmark.
 
 ## Scope and limitations
 
 - Payment, refund, and notification integrations are deterministic local adapters. No real money or message provider is called.
 - Authentication uses HTTP Basic for the assignment; production federation and token issuance are outside scope.
 - The default demo is deliberately small; the capacity profile is explicit and is intended for local functional checks rather than production benchmarking.
-- Payment/checkout expiry races, discount-limit races, and competing cleanup-worker recovery remain specialized integration-test gaps; the implemented suite covers the primary API journeys, ownership and validation contracts, schema validation, same-seat contention, reversed lock order, disjoint reservations, exact reservation expiry, worker delivery, and idempotent reminders.
+- The discount usage limit is enforced by a row lock taken on the discount code inside the checkout transaction, and a concurrent last-redemption test now proves the configured limit is not exceeded.
+- The previously deferred specialized scenarios are covered: payment finalization racing checkout expiry and resale, the discount last-redemption race, cleanup racing a reclaim, two workers competing for outbox events and recovering an expired lease, and retryable and terminal refund provider failures. Together with the primary API journeys, ownership and validation contracts, schema validation, same-seat contention, reversed lock order, disjoint reservations, exact reservation expiry, worker delivery, and idempotent reminders, no scenario in the testing strategy is currently omitted.
 
 ## AI-assisted workflow
 
-The repository retains the original [requirements](docs/requirements.md), [design](docs/DESIGN.md), [implementation plan](docs/IMPLEMENTATION_PLAN.md), [testing strategy](docs/TESTING.md), and [AGENTS.md](AGENTS.md) instructions used during development. AI assistance was used milestone by milestone to inspect requirements and existing code, propose a bounded change set, wait for approval, implement it, review the diff, and run focused and full verification.
+The repository retains the original [requirements](docs/requirements.md), [design](docs/DESIGN.md), and [AGENTS.md](AGENTS.md) instructions used during development; the implementation plan, testing strategy, and recording script are kept as local working notes. AI assistance was used milestone by milestone to inspect requirements and existing code, propose a bounded change set, wait for approval, implement it, review the diff, and run focused and full verification.
 
 The main AI-assisted review areas were transaction boundaries, deterministic lock ordering, deadlock retry placement, idempotency, late-payment compensation, worker bounds, cursor pagination, OpenAPI coverage, capacity data, and log safety. No named Codex skill package or external app connector was used; the work was repository-native Java development using the Maven wrapper, Git, and a local PostgreSQL instance. This is the complete skills/tools disclosure for the project.
 
 ## Submission guide
 
 - Swagger demonstration: [docs/DEMO_WORKFLOW.md](docs/DEMO_WORKFLOW.md)
-- Timed recording script: [docs/VIDEO_OUTLINE.md](docs/VIDEO_OUTLINE.md)
 - Detailed design and tradeoffs: [docs/DESIGN.md](docs/DESIGN.md)
-- Verification evidence and remaining specialized test gaps: [docs/TESTING.md](docs/TESTING.md)
+- Verification evidence: the recorded run summarised under [Verification](#verification) above
