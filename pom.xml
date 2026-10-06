@@ -105,7 +105,8 @@
                             <goal>generate</goal>
                         </goals>
                         <configuration>
-                            <inputSpec>${project.basedir}/src/main/resources/openapi/openapi.yaml</inputSpec>
+                            <!-- baseUri, not basedir: the parser treats the spec location as a URI, so a raw space in the checkout path breaks it -->
+                            <inputSpec>${project.baseUri}src/main/resources/openapi/openapi.yaml</inputSpec>
                             <generatorName>spring</generatorName>
                             <library>spring-boot</library>
                             <apiPackage>com.vijaypurohit.movietickets.generated.api</apiPackage>

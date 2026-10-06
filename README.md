@@ -123,6 +123,7 @@ Each domain module is split the same way: `web/` → `application/` → `persist
 ### Step 1 — create the database
 
 ```sql
+psql -d postgres
 CREATE ROLE movie_tickets LOGIN PASSWORD 'choose-a-local-password';
 CREATE DATABASE movie_tickets OWNER movie_tickets;
 ```
